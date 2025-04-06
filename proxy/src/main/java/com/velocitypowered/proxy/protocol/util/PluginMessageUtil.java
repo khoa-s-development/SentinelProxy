@@ -93,6 +93,7 @@ public final class PluginMessageUtil {
   }
 
   private static final QuietDecoderException ILLEGAL_CHANNEL = new QuietDecoderException("Illegal channel");
+
   /**
    * Fetches all the channels in a register or unregister plugin message.
    *
