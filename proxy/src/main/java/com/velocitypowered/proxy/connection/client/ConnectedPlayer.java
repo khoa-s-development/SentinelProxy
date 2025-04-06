@@ -175,7 +175,7 @@ public class ConnectedPlayer implements MinecraftConnectionAssociation, Player, 
   private final InternalTabList tabList;
   private final VelocityServer server;
   private ClientConnectionPhase connectionPhase;
-  private final Collection<String> clientsideChannels;
+  private final Collection<ChannelIdentifier> clientsideChannels;
   private final CompletableFuture<Void> teardownFuture = new CompletableFuture<>();
   private @MonotonicNonNull List<String> serversToTry = null;
   private final ResourcePackHandler resourcePackHandler;
@@ -1351,7 +1351,7 @@ public class ConnectedPlayer implements MinecraftConnectionAssociation, Player, 
    *
    * @return the channels
    */
-  public Collection<String> getClientsideChannels() {
+  public Collection<ChannelIdentifier> getClientsideChannels() {
     return clientsideChannels;
   }
 
