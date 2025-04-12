@@ -112,7 +112,7 @@ public final class PluginMessageUtil {
     }
     String payload = message.content().toString(StandardCharsets.UTF_8);
     String[] channels = payload.split("\0");
-    List<ChannelIdentifier> channelIdentifiers = new ArrayList<>();
+    ImmutableList.Builder<ChannelIdentifier> channelIdentifiers = ImmutableList.builderWithExpectedSize(channels.length);
     try {
       for (String channel : channels) {
         if (protocolVersion.noLessThan(ProtocolVersion.MINECRAFT_1_13)) {
@@ -128,7 +128,7 @@ public final class PluginMessageUtil {
         throw ILLEGAL_CHANNEL;
       }
     }
-    return ImmutableList.copyOf(channelIdentifiers);
+    return channelIdentifiers.build();
   }
 
   /**
