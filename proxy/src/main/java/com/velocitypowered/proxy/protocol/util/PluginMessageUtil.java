@@ -26,6 +26,7 @@ import com.velocitypowered.api.proxy.messages.ChannelIdentifier;
 import com.velocitypowered.api.proxy.messages.LegacyChannelIdentifier;
 import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
 import com.velocitypowered.api.util.ProxyVersion;
+import com.velocitypowered.proxy.connection.client.ConnectedPlayer;
 import com.velocitypowered.proxy.protocol.ProtocolUtils;
 import com.velocitypowered.proxy.protocol.netty.MinecraftDecoder;
 import com.velocitypowered.proxy.protocol.packet.PluginMessagePacket;
@@ -96,10 +97,12 @@ public final class PluginMessageUtil {
   /**
    * Fetches all the channels in a register or unregister plugin message.
    *
+   * @param existingChannels the number of channels already registered
    * @param message the message to get the channels from
    * @return the channels, as an immutable list
    */
-  public static List<ChannelIdentifier> getChannels(PluginMessagePacket message,
+  public static List<ChannelIdentifier> getChannels(int existingChannels,
+                                                    PluginMessagePacket message,
                                                     ProtocolVersion protocolVersion) {
     checkNotNull(message, "message");
     checkArgument(isRegister(message) || isUnregister(message), "Unknown channel type %s",
@@ -110,7 +113,10 @@ public final class PluginMessageUtil {
       return ImmutableList.of();
     }
     String payload = message.content().toString(StandardCharsets.UTF_8);
+    checkArgument(payload.length() <= Short.MAX_VALUE, "payload too long: %s", payload.length());
     String[] channels = payload.split("\0");
+    checkArgument(existingChannels + channels.length <= ConnectedPlayer.MAX_CLIENTSIDE_PLUGIN_CHANNELS,
+        "too many channels: %s + %s > %s", existingChannels, channels.length, ConnectedPlayer.MAX_CLIENTSIDE_PLUGIN_CHANNELS);
     ImmutableList.Builder<ChannelIdentifier> channelIdentifiers = ImmutableList.builderWithExpectedSize(channels.length);
     try {
       for (String channel : channels) {

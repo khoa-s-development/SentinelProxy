@@ -308,14 +308,17 @@ public class ClientPlaySessionHandler implements MinecraftSessionHandler {
         logger.warn("A plugin message was received while the backend server was not "
             + "ready. Channel: {}. Packet discarded.", packet.getChannel());
       } else if (PluginMessageUtil.isRegister(packet)) {
-        List<ChannelIdentifier> channels = PluginMessageUtil.getChannels(packet, this.player.getProtocolVersion());
+        List<ChannelIdentifier> channels =
+            PluginMessageUtil.getChannels(this.player.getClientsideChannels().size(), packet,
+                this.player.getProtocolVersion());
         player.getClientsideChannels().addAll(channels);
         server.getEventManager()
             .fireAndForget(
                 new PlayerChannelRegisterEvent(player, ImmutableList.copyOf(channels)));
         backendConn.write(packet.retain());
       } else if (PluginMessageUtil.isUnregister(packet)) {
-        player.getClientsideChannels().removeAll(PluginMessageUtil.getChannels(packet, this.player.getProtocolVersion()));
+        player.getClientsideChannels()
+            .removeAll(PluginMessageUtil.getChannels(0, packet, this.player.getProtocolVersion()));
         backendConn.write(packet.retain());
       } else if (PluginMessageUtil.isMcBrand(packet)) {
         String brand = PluginMessageUtil.readBrandMessage(packet.content());
@@ -392,7 +395,8 @@ public class ClientPlaySessionHandler implements MinecraftSessionHandler {
     // Complete client switch
     player.getConnection().setActiveSessionHandler(StateRegistry.CONFIG);
     VelocityServerConnection serverConnection = player.getConnectedServer();
-    server.getEventManager().fireAndForget(new PlayerEnteredConfigurationEvent(player, serverConnection));
+    server.getEventManager()
+        .fireAndForget(new PlayerEnteredConfigurationEvent(player, serverConnection));
     if (serverConnection != null) {
       MinecraftConnection smc = serverConnection.ensureConnected();
       CompletableFuture.runAsync(() -> {
