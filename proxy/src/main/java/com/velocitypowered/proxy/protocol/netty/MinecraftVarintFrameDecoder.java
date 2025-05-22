@@ -30,12 +30,15 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.codec.CorruptedFrameException;
 import java.util.List;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * Frames Minecraft server packets which are prefixed by a 21-bit VarInt encoding.
  */
 public class MinecraftVarintFrameDecoder extends ByteToMessageDecoder {
 
+  private static final Logger LOGGER = LogManager.getLogger(MinecraftVarintFrameDecoder.class);
   private static final QuietRuntimeException FRAME_DECODER_FAILED =
       new QuietRuntimeException("A packet frame decoder failed. For more information, launch "
           + "Velocity with -Dvelocity.packet-decode-logging=true to see more.");
@@ -128,6 +131,15 @@ public class MinecraftVarintFrameDecoder extends ByteToMessageDecoder {
       } else {
         out.add(in.readRetainedSlice(length));
       }
+    }
+  }
+
+  @Override
+  public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+    if (MinecraftDecoder.DEBUG) {
+      LOGGER.atWarn()
+          .withThrowable(cause)
+          .log("Exception caught while decoding frame for {}", ctx.channel().remoteAddress());
     }
   }
 
