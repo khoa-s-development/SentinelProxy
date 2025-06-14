@@ -1,4 +1,24 @@
-package com.khoasoma.portableproxy;
+/*
+ * Copyright (C) 2018-2023 Velocity Contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * Current Date and Time (UTC): 2025-06-14 10:36:20
+ * Current User's Login: Khoasoma
+ */
+
+package com.velocitypowered.proxy;
 
 import com.google.inject.Inject;
 import com.velocitypowered.api.event.Subscribe;
@@ -18,168 +38,202 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.slf4j.Logger;
 
 import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executors;
 
 @Plugin(
-    id = "project v11",
-    name = "project v11",
-    version = "2.0.0",
-    url = "https://github.com/Khoasoma/PortableProxy",
-    description = "Advanced Anti-DDoS Proxy with Dynamic Server Management",
-    authors = {"Khoasoma"}
+    id = "SentinelsProxy",
+    name = "SentinelsProxy",
+    version = BuildConstants.VERSION,
+    url = "https://zyndata.vn",
+    description = "A Fully AntiDDoS , Anti Exploit, Modern and hotswaping Proxy.",
+    authors = {"Velocity Team"}
 )
 public class Velocity {
+
     private final ProxyServer server;
     private final Logger logger;
     private final Path dataDirectory;
-    
-    // Managers
-    private ConfigManager configManager;
-    private ServerManager serverManager;
-    private AntiDDoSManager antiDDoSManager;
-    private PacketExploitManager packetExploitManager;
-    private AntiBotManager antiBotManager;
-    private MetricsManager metricsManager;
-    
-    // API Server
-    private ApiServer apiServer;
-    
-    // Update checker
-    private UpdateChecker updateChecker;
+    private final ScheduledExecutorService scheduler;
+
+    // Core components
+    private final VelocityConfiguration configuration;
+    private final ComponentRegistry componentRegistry;
+    private final CommandRegistry commandRegistry;
+    private final EventRegistry eventRegistry;
+
+    // Protection components 
+    private final SecurityManager securityManager;
+    private final MonitoringManager monitoringManager;
+
+    // Additional services
+    private final ApiServer apiServer;
+    private final UpdateChecker updateChecker;
 
     @Inject
     public Velocity(ProxyServer server, Logger logger, @DataDirectory Path dataDirectory) {
         this.server = server;
         this.logger = logger;
         this.dataDirectory = dataDirectory;
+        this.scheduler = Executors.newScheduledThreadPool(4);
+
+        // Initialize core components
+        this.configuration = new VelocityConfiguration(dataDirectory);
+        this.componentRegistry = new ComponentRegistry(this);
+        this.commandRegistry = new CommandRegistry(this);
+        this.eventRegistry = new EventRegistry(this);
+
+        // Initialize protection components
+        this.securityManager = new SecurityManager(this);
+        this.monitoringManager = new MonitoringManager(this);
+
+        // Initialize services
+        this.apiServer = new ApiServer(this);
+        this.updateChecker = new UpdateChecker(this);
     }
 
     @Subscribe
-    public void onProxyInitialization(ProxyInitializeEvent event) {
-        // Initialize config first
-        this.configManager = new ConfigManager(this);
-        if (!configManager.loadConfig()) {
-            logger.error("Failed to load configuration! Using default values.");
-        }
+    public void onProxyInitialize(ProxyInitializeEvent event) {
+        try {
+            // Load configuration
+            configuration.load();
 
-        // Initialize protection managers
-        initializeManagers();
-        
-        // Register event listeners
-        registerEventListeners();
-        
-        // Register commands
-        registerCommands();
-        
-        // Start API server if enabled
-        if (configManager.getConfig().getApi().isEnabled()) {
-            startApiServer();
-        }
-        
-        // Start metrics if enabled
-        if (configManager.getConfig().getMetrics().isEnabled()) {
-            startMetrics();
-        }
-        
-        // Schedule update checker
-        scheduleUpdateChecker();
-        
-        // Initialize cleanup tasks
-        scheduleCleanupTasks();
+            // Initialize components
+            initializeComponents();
 
-        logger.info("Proxy has been enabled! Version: 2.0.0");
+            // Register commands
+            registerCommands();
+
+            // Register event handlers
+            registerEventHandlers();
+
+            // Start services
+            startServices();
+
+            // Schedule tasks
+            scheduleTasks();
+
+            logger.info("Velocity {} has been initialized", BuildConstants.VERSION);
+
+        } catch (Exception e) {
+            logger.error("Failed to initialize Velocity", e);
+            throw new RuntimeException("Failed to initialize Velocity", e);
+        }
     }
 
-    @Subscribe
+    @Subscribe 
     public void onProxyShutdown(ProxyShutdownEvent event) {
-        // Cleanup and save data
-        if (apiServer != null) {
-            apiServer.stop();
+        try {
+            // Stop services
+            stopServices();
+
+            // Save data
+            saveData();
+
+            // Cleanup resources
+            cleanup();
+
+            logger.info("Velocity has been shutdown");
+
+        } catch (Exception e) {
+            logger.error("Error during shutdown", e);
         }
-        
-        if (metricsManager != null) {
-            metricsManager.shutdown();
-        }
-        
-        // Save any persistent data
-        configManager.saveConfig();
-        
-        logger.info("Proxy has been disabled!");
     }
 
-    private void initializeManagers() {
-        this.serverManager = new ServerManager(this);
-        this.antiDDoSManager = new AntiDDoSManager(this);
-        this.packetExploitManager = new PacketExploitManager(this);
-        this.antiBotManager = new AntiBotManager(this);
-        this.metricsManager = new MetricsManager(this);
-    }
-
-    private void registerEventListeners() {
-        server.getEventManager().register(this, antiDDoSManager);
-        server.getEventManager().register(this, packetExploitManager);
-        server.getEventManager().register(this, antiBotManager);
-        server.getEventManager().register(this, serverManager);
+    private void initializeComponents() {
+        componentRegistry.initialize();
+        securityManager.initialize();
+        monitoringManager.initialize();
     }
 
     private void registerCommands() {
-        server.getCommandManager().register("proxy", new ProxyCommand(this), "pproxy", "portableproxy");
-        server.getCommandManager().register("antibot", new AntiBotCommand(this));
-        server.getCommandManager().register("antiddos", new AntiDDoSCommand(this));
-        server.getCommandManager().register("server", new ServerCommand(this));
+        commandRegistry.registerCommand("velocity", new VelocityCommand(this));
+        commandRegistry.registerCommand("security", new SecurityCommand(this));
+        commandRegistry.registerCommand("monitor", new MonitorCommand(this));
+        commandRegistry.registerCommand("server", new ServerCommand(this));
     }
 
-    private void startApiServer() {
-        try {
-            this.apiServer = new ApiServer(this);
+    private void registerEventHandlers() {
+        eventRegistry.registerHandler(new ConnectionEventHandler(this));
+        eventRegistry.registerHandler(new SecurityEventHandler(this));
+        eventRegistry.registerHandler(new MonitoringEventHandler(this));
+    }
+
+    private void startServices() {
+        if (configuration.isApiEnabled()) {
             apiServer.start();
-        } catch (Exception e) {
-            logger.error("Failed to start API server!", e);
+        }
+
+        if (configuration.isMonitoringEnabled()) {
+            monitoringManager.start();
         }
     }
 
-    private void startMetrics() {
+    private void scheduleTasks() {
+        // Update checker
+        scheduler.scheduleWithFixedDelay(() -> {
+            checkForUpdates();
+        }, 1, 24, TimeUnit.HOURS);
+
+        // Cleanup task
+        scheduler.scheduleWithFixedDelay(() -> {
+            performCleanup();
+        }, 5, 5, TimeUnit.MINUTES);
+    }
+
+    private void checkForUpdates() {
+        updateChecker.checkForUpdates().thenAccept(updateAvailable -> {
+            if (updateAvailable) {
+                notifyUpdateAvailable();
+            }
+        });
+    }
+
+    private void notifyUpdateAvailable() {
+        logger.info("A new version of Velocity is available!");
+        
+        Component message = Component.text()
+            .content("A new version of Velocity is available!")
+            .color(NamedTextColor.GREEN)
+            .build();
+
+        server.getAllPlayers().stream()
+            .filter(player -> player.hasPermission("velocity.admin"))
+            .forEach(player -> player.sendMessage(message));
+    }
+
+    private void performCleanup() {
+        securityManager.cleanup();
+        monitoringManager.cleanup();
+        componentRegistry.cleanup();
+    }
+
+    private void stopServices() {
+        if (apiServer != null) {
+            apiServer.stop();
+        }
+
+        if (monitoringManager != null) {
+            monitoringManager.stop();
+        }
+
+        scheduler.shutdown();
+    }
+
+    private void saveData() {
+        configuration.save();
+        componentRegistry.saveData();
+        securityManager.saveData();
+    }
+
+    private void cleanup() {
         try {
-            metricsManager.start();
-        } catch (Exception e) {
-            logger.error("Failed to start metrics!", e);
+            scheduler.awaitTermination(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
-    }
-
-    private void scheduleUpdateChecker() {
-        this.updateChecker = new UpdateChecker(this);
-        server.getScheduler()
-            .buildTask(this, () -> {
-                updateChecker.checkForUpdates().thenAccept(updateAvailable -> {
-                    if (updateAvailable) {
-                        logger.info("A new version of PortableProxy is available!");
-                        // Notify online admins
-                        server.getAllPlayers().stream()
-                            .filter(player -> player.hasPermission("portableproxy.admin"))
-                            .forEach(player -> player.sendMessage(
-                                Component.text("A new version of PortableProxy is available!", 
-                                NamedTextColor.GREEN)
-                            ));
-                    }
-                });
-            })
-            .delay(1, TimeUnit.HOURS)
-            .repeat(24, TimeUnit.HOURS)
-            .schedule();
-    }
-
-    private void scheduleCleanupTasks() {
-        // Schedule periodic cleanup tasks
-        server.getScheduler()
-            .buildTask(this, () -> {
-                antiBotManager.cleanup();
-                antiDDoSManager.cleanup();
-                packetExploitManager.cleanup();
-                metricsManager.cleanup();
-            })
-            .delay(5, TimeUnit.MINUTES)
-            .repeat(5, TimeUnit.MINUTES)
-            .schedule();
     }
 
     // Getters
@@ -188,35 +242,35 @@ public class Velocity {
     }
 
     public Logger getLogger() {
-        return logger;
+        return logger; 
     }
 
     public Path getDataDirectory() {
         return dataDirectory;
     }
 
-    public ConfigManager getConfigManager() {
-        return configManager;
+    public VelocityConfiguration getConfiguration() {
+        return configuration;
     }
 
-    public ServerManager getServerManager() {
-        return serverManager;
+    public SecurityManager getSecurityManager() {
+        return securityManager;
     }
 
-    public AntiDDoSManager getAntiDDoSManager() {
-        return antiDDoSManager;
+    public MonitoringManager getMonitoringManager() {
+        return monitoringManager;
     }
 
-    public PacketExploitManager getPacketExploitManager() {
-        return packetExploitManager;
+    public ComponentRegistry getComponentRegistry() {
+        return componentRegistry;
     }
 
-    public AntiBotManager getAntiBotManager() {
-        return antiBotManager;
+    public CommandRegistry getCommandRegistry() {
+        return commandRegistry;
     }
 
-    public MetricsManager getMetricsManager() {
-        return metricsManager;
+    public EventRegistry getEventRegistry() {
+        return eventRegistry;
     }
 
     public ApiServer getApiServer() {
