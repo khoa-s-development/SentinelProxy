@@ -194,3 +194,5 @@ public class AdvancedAntiBotHandler {
         attackMode = connectionsLastMinute > threshold;
     }
 }
+// testing
+// This class is designed to be used in a Velocity proxy environment.
