@@ -18,7 +18,7 @@ tasks {
 
     jar {
         manifest {
-            attributes["Implementation-Title"] = "Velocity"
+            attributes["Implementation-Title"] = "Project v11 Velocity Fork"
             attributes["Implementation-Vendor"] = "Velocity Contributors"
             attributes["Multi-Release"] = "true"
         }

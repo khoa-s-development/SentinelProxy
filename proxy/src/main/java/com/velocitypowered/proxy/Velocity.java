@@ -1,89 +1,225 @@
-/*
- * Copyright (C) 2018-2023 Velocity Contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+package com.khoasoma.portableproxy;
 
-package com.velocitypowered.proxy;
+import com.google.inject.Inject;
+import com.velocitypowered.api.event.Subscribe;
+import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
+import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
+import com.velocitypowered.api.plugin.Plugin;
+import com.velocitypowered.api.plugin.annotation.DataDirectory;
+import com.velocitypowered.api.proxy.ProxyServer;
+import com.velocitypowered.proxy.command.*;
+import com.velocitypowered.proxy.config.VelocityConfiguration;
+import com.velocitypowered.proxy.protection.*;
+import com.velocitypowered.api.ApiServer;
+import com.velocitypowered.metrics.MetricsManager;
+import com.velocitypowered.proxy.util.UpdateChecker;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import org.slf4j.Logger;
 
-import com.velocitypowered.proxy.util.VelocityProperties;
-import io.netty.util.ResourceLeakDetector;
-import io.netty.util.ResourceLeakDetector.Level;
-import java.text.DecimalFormat;
+import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
-/**
- * The main class. Responsible for parsing command line arguments and then launching the
- * proxy.
- */
+@Plugin(
+    id = "project v11",
+    name = "project v11",
+    version = "2.0.0",
+    url = "https://github.com/Khoasoma/PortableProxy",
+    description = "Advanced Anti-DDoS Proxy with Dynamic Server Management",
+    authors = {"Khoasoma"}
+)
 public class Velocity {
+    private final ProxyServer server;
+    private final Logger logger;
+    private final Path dataDirectory;
+    
+    // Managers
+    private ConfigManager configManager;
+    private ServerManager serverManager;
+    private AntiDDoSManager antiDDoSManager;
+    private PacketExploitManager packetExploitManager;
+    private AntiBotManager antiBotManager;
+    private MetricsManager metricsManager;
+    
+    // API Server
+    private ApiServer apiServer;
+    
+    // Update checker
+    private UpdateChecker updateChecker;
 
-  private static final Logger logger;
-
-  static {
-    System.setProperty("java.util.logging.manager", "org.apache.logging.log4j.jul.LogManager");
-    logger = LogManager.getLogger(Velocity.class);
-
-    // We use BufferedImage for favicons, and on macOS this puts the Java application in the dock.
-    // How inconvenient. Force AWT to work with its head chopped off.
-    System.setProperty("java.awt.headless", "true");
-
-    // If Velocity's natives are being extracted to a different temporary directory, make sure the
-    // Netty natives are extracted there as well
-    if (VelocityProperties.hasProperty("velocity.natives-tmpdir")) {
-      System.setProperty("io.netty.native.workdir", System.getProperty("velocity.natives-tmpdir"));
+    @Inject
+    public Velocity(ProxyServer server, Logger logger, @DataDirectory Path dataDirectory) {
+        this.server = server;
+        this.logger = logger;
+        this.dataDirectory = dataDirectory;
     }
 
-    // Restore allocator used before Netty 4.2 due to oom issues with the adaptive allocator
-    if (System.getProperty("io.netty.allocator.type") == null) {
-      System.setProperty("io.netty.allocator.type", "pooled");
+    @Subscribe
+    public void onProxyInitialization(ProxyInitializeEvent event) {
+        // Initialize config first
+        this.configManager = new ConfigManager(this);
+        if (!configManager.loadConfig()) {
+            logger.error("Failed to load configuration! Using default values.");
+        }
+
+        // Initialize protection managers
+        initializeManagers();
+        
+        // Register event listeners
+        registerEventListeners();
+        
+        // Register commands
+        registerCommands();
+        
+        // Start API server if enabled
+        if (configManager.getConfig().getApi().isEnabled()) {
+            startApiServer();
+        }
+        
+        // Start metrics if enabled
+        if (configManager.getConfig().getMetrics().isEnabled()) {
+            startMetrics();
+        }
+        
+        // Schedule update checker
+        scheduleUpdateChecker();
+        
+        // Initialize cleanup tasks
+        scheduleCleanupTasks();
+
+        logger.info("Proxy has been enabled! Version: 2.0.0");
     }
 
-    // Disable the resource leak detector by default as it reduces performance. Allow the user to
-    // override this if desired.
-    if (!VelocityProperties.hasProperty("io.netty.leakDetection.level")) {
-      ResourceLeakDetector.setLevel(Level.DISABLED);
+    @Subscribe
+    public void onProxyShutdown(ProxyShutdownEvent event) {
+        // Cleanup and save data
+        if (apiServer != null) {
+            apiServer.stop();
+        }
+        
+        if (metricsManager != null) {
+            metricsManager.shutdown();
+        }
+        
+        // Save any persistent data
+        configManager.saveConfig();
+        
+        logger.info("Proxy has been disabled!");
     }
-  }
 
-  /**
-   * Main method that the JVM will call when {@code java -jar velocity.jar} is executed.
-   *
-   * @param args the arguments to the proxy
-   */
-  public static void main(String... args) {
-    final ProxyOptions options = new ProxyOptions(args);
-    if (options.isHelp()) {
-      return;
+    private void initializeManagers() {
+        this.serverManager = new ServerManager(this);
+        this.antiDDoSManager = new AntiDDoSManager(this);
+        this.packetExploitManager = new PacketExploitManager(this);
+        this.antiBotManager = new AntiBotManager(this);
+        this.metricsManager = new MetricsManager(this);
     }
 
-    long startTime = System.nanoTime();
+    private void registerEventListeners() {
+        server.getEventManager().register(this, antiDDoSManager);
+        server.getEventManager().register(this, packetExploitManager);
+        server.getEventManager().register(this, antiBotManager);
+        server.getEventManager().register(this, serverManager);
+    }
 
-    VelocityServer server = new VelocityServer(options);
-    server.start();
-    Runtime.getRuntime().addShutdownHook(new Thread(() -> server.shutdown(false),
-        "Shutdown thread"));
+    private void registerCommands() {
+        server.getCommandManager().register("proxy", new ProxyCommand(this), "pproxy", "portableproxy");
+        server.getCommandManager().register("antibot", new AntiBotCommand(this));
+        server.getCommandManager().register("antiddos", new AntiDDoSCommand(this));
+        server.getCommandManager().register("server", new ServerCommand(this));
+    }
 
-    double bootTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime) / 1000d;
-    logger.info("Done ({}s)!", new DecimalFormat("#.##").format(bootTime));
-    server.getConsoleCommandSource().start();
+    private void startApiServer() {
+        try {
+            this.apiServer = new ApiServer(this);
+            apiServer.start();
+        } catch (Exception e) {
+            logger.error("Failed to start API server!", e);
+        }
+    }
 
-    // If we don't have a console available (because SimpleTerminalConsole returned), then we still
-    // need to wait, otherwise the JVM will reap us as no non-daemon threads will be active once the
-    // main thread exits.
-    server.awaitProxyShutdown();
-  }
+    private void startMetrics() {
+        try {
+            metricsManager.start();
+        } catch (Exception e) {
+            logger.error("Failed to start metrics!", e);
+        }
+    }
+
+    private void scheduleUpdateChecker() {
+        this.updateChecker = new UpdateChecker(this);
+        server.getScheduler()
+            .buildTask(this, () -> {
+                updateChecker.checkForUpdates().thenAccept(updateAvailable -> {
+                    if (updateAvailable) {
+                        logger.info("A new version of PortableProxy is available!");
+                        // Notify online admins
+                        server.getAllPlayers().stream()
+                            .filter(player -> player.hasPermission("portableproxy.admin"))
+                            .forEach(player -> player.sendMessage(
+                                Component.text("A new version of PortableProxy is available!", 
+                                NamedTextColor.GREEN)
+                            ));
+                    }
+                });
+            })
+            .delay(1, TimeUnit.HOURS)
+            .repeat(24, TimeUnit.HOURS)
+            .schedule();
+    }
+
+    private void scheduleCleanupTasks() {
+        // Schedule periodic cleanup tasks
+        server.getScheduler()
+            .buildTask(this, () -> {
+                antiBotManager.cleanup();
+                antiDDoSManager.cleanup();
+                packetExploitManager.cleanup();
+                metricsManager.cleanup();
+            })
+            .delay(5, TimeUnit.MINUTES)
+            .repeat(5, TimeUnit.MINUTES)
+            .schedule();
+    }
+
+    // Getters
+    public ProxyServer getServer() {
+        return server;
+    }
+
+    public Logger getLogger() {
+        return logger;
+    }
+
+    public Path getDataDirectory() {
+        return dataDirectory;
+    }
+
+    public ConfigManager getConfigManager() {
+        return configManager;
+    }
+
+    public ServerManager getServerManager() {
+        return serverManager;
+    }
+
+    public AntiDDoSManager getAntiDDoSManager() {
+        return antiDDoSManager;
+    }
+
+    public PacketExploitManager getPacketExploitManager() {
+        return packetExploitManager;
+    }
+
+    public AntiBotManager getAntiBotManager() {
+        return antiBotManager;
+    }
+
+    public MetricsManager getMetricsManager() {
+        return metricsManager;
+    }
+
+    public ApiServer getApiServer() {
+        return apiServer;
+    }
 }

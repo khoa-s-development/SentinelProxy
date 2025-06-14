@@ -51,18 +51,27 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
-
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 /**
- * Velocity's configuration.
+ * Velocity's configuration. Recoded from the ground up in 1.2.0, this class is responsible for
+ * reading the configuration file, validating it, and providing access to the configuration
  */
 public class VelocityConfiguration implements ProxyConfig {
 
   private static final Logger logger = LogManager.getLogger(VelocityConfiguration.class);
 
+  @Expose private final Security security; 
+  @Expose private final AntiDDoS antiddos;
+  @Expose private final AntiBot antibot;
+  @Expose private final PacketFilter packetFilter;
   @Expose
   private String bind = "0.0.0.0:25565";
   @Expose
-  private String motd = "<aqua>A Velocity Server";
+  private String motd = "<aqua>A Proxy v11 Velocity Server";
   @Expose
   private int showMaxPlayers = 500;
   @Expose
@@ -94,13 +103,18 @@ public class VelocityConfiguration implements ProxyConfig {
   @Expose
   private boolean forceKeyAuthentication = true; // Added in 1.19
 
-  private VelocityConfiguration(Servers servers, ForcedHosts forcedHosts, Advanced advanced,
+  private VelocityConfiguration(Servers servers, ForcedHosts forcedHosts, Advanced advanced, Security security,
+      AntiDDoS antiddos, AntiBot antibot, PacketFilter packetFilter,
       Query query, Metrics metrics) {
     this.servers = servers;
     this.forcedHosts = forcedHosts;
     this.advanced = advanced;
     this.query = query;
     this.metrics = metrics;
+    this.security = security();
+    this.antiddos = antiddos();
+    this.antibot = antibot();   
+    this.packetFilter = packetFilter();
   }
 
   private VelocityConfiguration(String bind, String motd, int showMaxPlayers, boolean onlineMode,
@@ -129,6 +143,87 @@ public class VelocityConfiguration implements ProxyConfig {
     this.metrics = metrics;
     this.forceKeyAuthentication = forceKeyAuthentication;
   }
+    public static class Security {
+        @Expose private boolean advancedProtection = true;
+        @Expose private int minKeySize = 2048;
+        @Expose private List<String> allowedCiphers = Arrays.asList(
+            "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+            "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+        );
+        @Expose private Map<String, List<String>> accessControl = new HashMap<>();
+
+        private Security(CommentedConfig config) {
+            if (config != null) {
+                this.advancedProtection = config.getOrElse("advanced-protection", true);
+                this.minKeySize = config.getIntOrElse("min-key-size", 2048);
+                this.allowedCiphers = config.getOrElse("allowed-ciphers", allowedCiphers);
+                this.accessControl = parseAccessControl(config.get("access-control"));
+            }
+        }
+    }
+   public static class AntiDDoS {
+        @Expose private boolean enabled = true;
+        @Expose private int maxConnections = 1000;
+        @Expose private int connectionThreshold = 100;
+        @Expose private int blacklistDuration = 3600;
+        @Expose private Map<String, Integer> thresholds = new HashMap<>();
+
+        private AntiDDoS(CommentedConfig config) {
+            if (config != null) {
+                this.enabled = config.getOrElse("enabled", true);
+                this.maxConnections = config.getIntOrElse("max-connections", 1000);
+                this.connectionThreshold = config.getIntOrElse("connection-threshold", 100);
+                this.blacklistDuration = config.getIntOrElse("blacklist-duration", 3600);
+                this.thresholds = parseThresholds(config.get("thresholds"));
+            }
+        }
+   }
+   public static class AntiDDoS {
+        @Expose private boolean enabled = true;
+        @Expose private int maxConnections = 1000;
+        @Expose private int connectionThreshold = 100;
+        @Expose private int blacklistDuration = 3600;
+        @Expose private Map<String, Integer> thresholds = new HashMap<>();
+
+        private AntiDDoS(CommentedConfig config) {
+            if (config != null) {
+                this.enabled = config.getOrElse("enabled", true);
+                this.maxConnections = config.getIntOrElse("max-connections", 1000);
+                this.connectionThreshold = config.getIntOrElse("connection-threshold", 100);
+                this.blacklistDuration = config.getIntOrElse("blacklist-duration", 3600);
+                this.thresholds = parseThresholds(config.get("thresholds"));
+            }
+        }
+    }
+   public static class AntiBot {
+        @Expose private boolean enabled = true;
+        @Expose private String mode = "AUTO";
+        @Expose private int verificationTimeout = 30;
+        @Expose private Map<String, Object> checks = new HashMap<>();
+
+        private AntiBot(CommentedConfig config) {
+            if (config != null) {
+                this.enabled = config.getOrElse("enabled", true);
+                this.mode = config.getOrElse("mode", "AUTO");
+                this.verificationTimeout = config.getIntOrElse("verification-timeout", 30);
+                this.checks = parseChecks(config.get("checks"));
+            }
+        }
+   }
+public static class PacketFilter {
+        @Expose private boolean enabled = true;
+        @Expose private int maxPacketSize = 2097152;
+        @Expose private List<String> blockedPackets = new ArrayList<>();
+        @Expose private Map<String, Integer> rateLimits = new HashMap<>();
+
+        private PacketFilter(CommentedConfig config) {
+            if (config != null) {
+                this.enabled = config.getOrElse("enabled", true);
+                this.maxPacketSize = config.getIntOrElse("max-packet-size", 2097152);
+                this.blockedPackets = config.getOrElse("blocked-packets", blockedPackets);
+                this.rateLimits = parseRateLimits(config.get("rate-limits"));
+            }
+        }
 
   /**
    * Attempts to validate the configuration.
@@ -258,7 +353,10 @@ public class VelocityConfiguration implements ProxyConfig {
   public InetSocketAddress getBind() {
     return AddressUtil.parseAndResolveAddress(bind);
   }
-
+  @Override
+  public int getKickAfterRateLimitedTabCompletes() {
+      return advanced.getKickAfterRateLimitedTabCompletes();
+    }
   @Override
   public boolean isQueryEnabled() {
     return query.isQueryEnabled();
@@ -484,7 +582,20 @@ public class VelocityConfiguration implements ProxyConfig {
     if (defaultConfigLocation == null) {
       throw new RuntimeException("Default configuration file does not exist.");
     }
+    CommentedConfig securityConfig = config.get("security");
+    CommentedConfig antiddosConfig = config.get("antiddos");
+    CommentedConfig antibotConfig = config.get("antibot"); 
+    CommentedConfig packetFilterConfig = config.get("packet-filter");
 
+    // Timezone
+            String timestamp = LocalDateTime.now(ZoneOffset.UTC)
+            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        String user = System.getProperty("user.name");
+        
+        config.setComment("", String.format(
+            "Current Date and Time (UTC): %s%n" +
+            "Current User's Login: %s", 
+            timestamp, user));
     // Create the forwarding-secret file on first-time startup if it doesn't exist
     final Path defaultForwardingSecretPath = Path.of("forwarding.secret");
     if (Files.notExists(path) && Files.notExists(defaultForwardingSecretPath)) {
@@ -584,6 +695,10 @@ public class VelocityConfiguration implements ProxyConfig {
               new Advanced(advancedConfig),
               new Query(queryConfig),
               new Metrics(metricsConfig),
+              new Security(securityConfig),
+              new AntiDDoS(antiddosConfig),
+              new AntiBot(antibotConfig),
+              new PacketFilter(packetFilterConfig),
               forceKeyAuthentication
       );
     }
@@ -954,7 +1069,21 @@ public class VelocityConfiguration implements ProxyConfig {
     public String getQueryMap() {
       return queryMap;
     }
+    public Security getSecurity() {
+        return security;
+    }
 
+    public AntiDDoS getAntiDDoS() {
+        return antiddos; 
+    }
+
+    public AntiBot getAntiBot() {
+        return antibot;
+    }
+
+    public PacketFilter getPacketFilter() {
+        return packetFilter;
+    }
     public boolean shouldQueryShowPlugins() {
       return showPlugins;
     }
@@ -988,3 +1117,7 @@ public class VelocityConfiguration implements ProxyConfig {
     }
   }
 }
+   
+
+
+   }

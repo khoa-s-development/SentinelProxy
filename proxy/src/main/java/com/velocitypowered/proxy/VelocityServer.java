@@ -171,7 +171,10 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
   private final VelocityScheduler scheduler;
   private final VelocityChannelRegistrar channelRegistrar = new VelocityChannelRegistrar();
   private final ServerListPingHandler serverListPingHandler;
-
+  private final SecurityManager securityManager;
+  private final AntiDDoSManager antiDDoSManager;
+  private final AntiBotManager antiBotManager;
+  private final PacketFilterManager packetFilterManager;
   VelocityServer(final ProxyOptions options) {
     pluginManager = new VelocityPluginManager(this);
     eventManager = new VelocityEventManager(pluginManager);
@@ -182,8 +185,26 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     servers = new ServerMap(this);
     serverListPingHandler = new ServerListPingHandler(this);
     this.options = options;
+    this.securityManager = new SecurityManager(this);
+    this.antiDDoSManager = new AntiDDoSManager(this);
+    this.antiBotManager = new AntiBotManager(this);
+    this.packetFilterManager = new PacketFilterManager(this); 
   }
+public SecurityManager getSecurityManager() {
+    return securityManager;
+}
 
+public AntiDDoSManager getAntiDDoSManager() {
+    return antiDDoSManager;
+}
+
+public AntiBotManager getAntiBotManager() {
+    return antiBotManager;
+}
+
+public PacketFilterManager getPacketFilterManager() {
+    return packetFilterManager;
+}
   public KeyPair getServerKeyPair() {
     return serverKeyPair;
   }
@@ -237,6 +258,11 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     logger.info("Booting up {} {}...", getVersion().getName(), getVersion().getVersion());
     console.setupStreams();
     pluginManager.registerPlugin(this.createVirtualPlugin());
+    securityManager.start();
+    antiDDoSManager.start();
+    antiBotManager.start();
+    packetFilterManager.start();
+
 
     registerTranslations();
 
@@ -481,6 +507,10 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     if (!newConfiguration.validate()) {
       return false;
     }
+    securityManager.reload();
+    antiDDoSManager.reload();
+    antiBotManager.reload();
+    packetFilterManager.reload();
 
     // Re-register servers. If a server is being replaced, make sure to note what players need to
     // move back to a fallback server.
@@ -573,7 +603,10 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
 
     Runnable shutdownProcess = () -> {
       logger.info("Shutting down the proxy...");
-
+        securityManager.shutdown();
+        antiDDoSManager.shutdown();
+        antiBotManager.shutdown();
+        packetFilterManager.shutdown();
       // Shutdown the connection manager, this should be
       // done first to refuse new connections
       cm.shutdown();
@@ -679,6 +712,12 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
    * @return {@code true} if we can register the connection, {@code false} if not
    */
   public boolean canRegisterConnection(ConnectedPlayer connection) {
+    if (!antiBotManager.canRegisterConnection(connection)) {
+        return false;
+    }
+    if (!antiDDoSManager.canRegisterConnection(connection)) {
+        return false;
+    }
     if (configuration.isOnlineMode() && configuration.isOnlineModeKickExistingPlayers()) {
       return true;
     }
