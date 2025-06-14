@@ -24,7 +24,34 @@ public class ConnectionContext extends SecurityContext {
     }
 
     public int getProtocolVersion() {
-        return event.getConnection().getProtocolVersion().getProtocol();
+        return event.getConnection().gpackage com.velocitypowered.proxy.security.rules;
+
+import com.velocitypowered.proxy.protocol.MinecraftPacket;
+import io.netty.channel.ChannelHandlerContext;
+
+public class PacketContext extends SecurityContext {
+    private final ChannelHandlerContext channelContext;
+    private final MinecraftPacket packet;
+    private final long timestamp;
+
+    public PacketContext(ChannelHandlerContext ctx, MinecraftPacket packet) {
+        this.channelContext = ctx;
+        this.packet = packet;
+        this.timestamp = System.currentTimeMillis();
+    }
+
+    public ChannelHandlerContext getChannelContext() {
+        return channelContext;
+    }
+
+    public MinecraftPacket getPacket() {
+        return packet;
+    }
+
+    public long getTimestamp() {
+        return timestamp;
+    }
+}etProtocolVersion().getProtocol();
     }
 
     public void deny(String reason) {

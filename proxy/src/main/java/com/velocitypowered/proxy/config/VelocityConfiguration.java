@@ -56,6 +56,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 /**
  * Velocity's configuration. Recoded from the ground up in 1.2.0, this class is responsible for
  * reading the configuration file, validating it, and providing access to the configuration
@@ -103,9 +106,15 @@ public class VelocityConfiguration implements ProxyConfig {
   @Expose
   private boolean forceKeyAuthentication = true; // Added in 1.19
 
-  private VelocityConfiguration(Servers servers, ForcedHosts forcedHosts, Advanced advanced, Security security,
-      AntiDDoS antiddos, AntiBot antibot, PacketFilter packetFilter,
-      Query query, Metrics metrics) {
+  private VelocityConfiguration(String bind, String motd, int showMaxPlayers, boolean onlineMode,
+            boolean preventClientProxyConnections, boolean announceForge, boolean forwardIp,
+            PlayerInfoForwardingMode playerInfoForwardingMode, Map<String, String> redirects,
+            int compressionThreshold, int compressionLevel, int loginRatelimit,
+            boolean enablePlayerAddressLogging, boolean samplePlayersInPing,
+            boolean announceProxyCommands, String favicon, Servers servers, 
+            ForcedHosts forcedHosts, Advanced advanced, Security security,
+            AntiDDoS antiddos, AntiBot antibot, PacketFilter packetFilter,
+            Query query, Metrics metrics) {
     this.servers = servers;
     this.forcedHosts = forcedHosts;
     this.advanced = advanced;
@@ -142,89 +151,85 @@ public class VelocityConfiguration implements ProxyConfig {
     this.query = query;
     this.metrics = metrics;
     this.forceKeyAuthentication = forceKeyAuthentication;
+    this.security = security();
+    this.antiddos = antiddos();
+    this.antibot = antibot();
+    this.packetFilter = packetFilter();
   }
-    public static class Security {
-        @Expose private boolean advancedProtection = true;
-        @Expose private int minKeySize = 2048;
-        @Expose private List<String> allowedCiphers = Arrays.asList(
-            "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
-            "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
-        );
-        @Expose private Map<String, List<String>> accessControl = new HashMap<>();
+public static class Security {
+    @Expose private boolean advancedProtection = true;
+    @Expose private int minKeySize = 2048;
+    @Expose private List<String> allowedCiphers = Arrays.asList(
+        "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+        "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+    );
+    @Expose private Map<String, List<String>> accessControl = new HashMap<>();
 
-        private Security(CommentedConfig config) {
-            if (config != null) {
-                this.advancedProtection = config.getOrElse("advanced-protection", true);
-                this.minKeySize = config.getIntOrElse("min-key-size", 2048);
-                this.allowedCiphers = config.getOrElse("allowed-ciphers", allowedCiphers);
-                this.accessControl = parseAccessControl(config.get("access-control"));
+    private Map<String, List<String>> parseAccessControl(UnmodifiableConfig config) {
+        if (config == null) return new HashMap<>();
+        
+        Map<String, List<String>> result = new HashMap<>();
+        for (UnmodifiableConfig.Entry entry : config.entrySet()) {
+            if (entry.getValue() instanceof List) {
+                result.put(entry.getKey(), (List<String>) entry.getValue());
             }
         }
+        return result;
     }
-   public static class AntiDDoS {
-        @Expose private boolean enabled = true;
-        @Expose private int maxConnections = 1000;
-        @Expose private int connectionThreshold = 100;
-        @Expose private int blacklistDuration = 3600;
-        @Expose private Map<String, Integer> thresholds = new HashMap<>();
+}
+public static class AntiDDoS {
+    @Expose private boolean enabled = true;
+    @Expose private int maxConnections = 1000;
+    @Expose private int connectionThreshold = 100;
+    @Expose private int blacklistDuration = 3600;
+    @Expose private Map<String, Integer> thresholds = new HashMap<>();
 
-        private AntiDDoS(CommentedConfig config) {
-            if (config != null) {
-                this.enabled = config.getOrElse("enabled", true);
-                this.maxConnections = config.getIntOrElse("max-connections", 1000);
-                this.connectionThreshold = config.getIntOrElse("connection-threshold", 100);
-                this.blacklistDuration = config.getIntOrElse("blacklist-duration", 3600);
-                this.thresholds = parseThresholds(config.get("thresholds"));
+    private Map<String, Integer> parseThresholds(UnmodifiableConfig config) {
+        if (config == null) return new HashMap<>();
+        
+        Map<String, Integer> result = new HashMap<>();
+        for (UnmodifiableConfig.Entry entry : config.entrySet()) {
+            if (entry.getValue() instanceof Integer) {
+                result.put(entry.getKey(), (Integer) entry.getValue());
             }
         }
-   }
-   public static class AntiDDoS {
-        @Expose private boolean enabled = true;
-        @Expose private int maxConnections = 1000;
-        @Expose private int connectionThreshold = 100;
-        @Expose private int blacklistDuration = 3600;
-        @Expose private Map<String, Integer> thresholds = new HashMap<>();
-
-        private AntiDDoS(CommentedConfig config) {
-            if (config != null) {
-                this.enabled = config.getOrElse("enabled", true);
-                this.maxConnections = config.getIntOrElse("max-connections", 1000);
-                this.connectionThreshold = config.getIntOrElse("connection-threshold", 100);
-                this.blacklistDuration = config.getIntOrElse("blacklist-duration", 3600);
-                this.thresholds = parseThresholds(config.get("thresholds"));
-            }
-        }
+        return result;
     }
-   public static class AntiBot {
-        @Expose private boolean enabled = true;
-        @Expose private String mode = "AUTO";
-        @Expose private int verificationTimeout = 30;
-        @Expose private Map<String, Object> checks = new HashMap<>();
+}
+public static class AntiBot {
+    @Expose private boolean enabled = true;
+    @Expose private String mode = "AUTO";
+    @Expose private int verificationTimeout = 30;
+    @Expose private Map<String, Object> checks = new HashMap<>();
 
-        private AntiBot(CommentedConfig config) {
-            if (config != null) {
-                this.enabled = config.getOrElse("enabled", true);
-                this.mode = config.getOrElse("mode", "AUTO");
-                this.verificationTimeout = config.getIntOrElse("verification-timeout", 30);
-                this.checks = parseChecks(config.get("checks"));
-            }
+    private Map<String, Object> parseChecks(UnmodifiableConfig config) {
+        if (config == null) return new HashMap<>();
+        
+        Map<String, Object> result = new HashMap<>();
+        for (UnmodifiableConfig.Entry entry : config.entrySet()) {
+            result.put(entry.getKey(), entry.getValue());
         }
-   }
+        return result;
+    }
+}
 public static class PacketFilter {
-        @Expose private boolean enabled = true;
-        @Expose private int maxPacketSize = 2097152;
-        @Expose private List<String> blockedPackets = new ArrayList<>();
-        @Expose private Map<String, Integer> rateLimits = new HashMap<>();
+    @Expose private boolean enabled = true;
+    @Expose private int maxPacketSize = 2097152; // 2MB mặc định
+    @Expose private List<String> blockedPackets = new ArrayList<>();
+    @Expose private Map<String, Integer> rateLimits = new HashMap<>();
 
-        private PacketFilter(CommentedConfig config) {
-            if (config != null) {
-                this.enabled = config.getOrElse("enabled", true);
-                this.maxPacketSize = config.getIntOrElse("max-packet-size", 2097152);
-                this.blockedPackets = config.getOrElse("blocked-packets", blockedPackets);
-                this.rateLimits = parseRateLimits(config.get("rate-limits"));
+    private Map<String, Integer> parseRateLimits(UnmodifiableConfig config) {
+        if (config == null) return new HashMap<>();
+        
+        Map<String, Integer> result = new HashMap<>();
+        for (UnmodifiableConfig.Entry entry : config.entrySet()) {
+            if (entry.getValue() instanceof Integer) {
+                result.put(entry.getKey(), (Integer) entry.getValue());
             }
         }
-
+        return result;
+    }
+}
   /**
    * Attempts to validate the configuration.
    *
@@ -333,7 +338,27 @@ public static class PacketFilter {
       logger.error("Invalid command rate limit {}", advanced.commandRateLimit);
       valid = false;
     }
+    if (security.getMinKeySize() < 1024) {
+        logger.error("Min key size must be at least 1024 bits");
+        valid = false;
+    }
+    // Validate AntiDDoS config  
+    if (antiddos.getMaxConnections() < 1) {
+        logger.error("Max connections must be positive");
+        valid = false;
+    }
 
+    // Validate AntiBot config
+    if (antibot.getVerificationTimeout() < 0) {
+        logger.error("Verification timeout cannot be negative");
+        valid = false;
+    }
+
+    // Validate PacketFilter config
+    if (packetFilter.getMaxPacketSize() < 0) {
+        logger.error("Max packet size cannot be negative"); 
+        valid = false;
+    }
     loadFavicon();
 
     return valid;
@@ -588,14 +613,14 @@ public static class PacketFilter {
     CommentedConfig packetFilterConfig = config.get("packet-filter");
 
     // Timezone
-            String timestamp = LocalDateTime.now(ZoneOffset.UTC)
-            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-        String user = System.getProperty("user.name");
-        
-        config.setComment("", String.format(
-            "Current Date and Time (UTC): %s%n" +
-            "Current User's Login: %s", 
-            timestamp, user));
+    String timestamp = LocalDateTime.now(ZoneOffset.UTC)
+        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+    String user = System.getProperty("user.name");
+    
+    config.setComment("", String.format(
+        "Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): %s\n" +
+        "Current User's Login: %s", 
+        timestamp, user));
     // Create the forwarding-secret file on first-time startup if it doesn't exist
     final Path defaultForwardingSecretPath = Path.of("forwarding.secret");
     if (Files.notExists(path) && Files.notExists(defaultForwardingSecretPath)) {
@@ -677,30 +702,30 @@ public static class PacketFilter {
         throw new RuntimeException("The forwarding-secret file must not be empty.");
       }
 
-      return new VelocityConfiguration(
-              bind,
-              motd,
-              maxPlayers,
-              onlineMode,
-              preventClientProxyConnections,
-              announceForge,
-              forwardingMode,
-              forwardingSecret,
-              kickExisting,
-              pingPassthroughMode,
-              samplePlayersInPing,
-              enablePlayerAddressLogging,
-              new Servers(serversConfig),
-              new ForcedHosts(forcedHostsConfig),
-              new Advanced(advancedConfig),
-              new Query(queryConfig),
-              new Metrics(metricsConfig),
-              new Security(securityConfig),
-              new AntiDDoS(antiddosConfig),
-              new AntiBot(antibotConfig),
-              new PacketFilter(packetFilterConfig),
-              forceKeyAuthentication
-      );
+return new VelocityConfiguration(
+    bind,
+    motd,
+    maxPlayers,
+    onlineMode,
+    preventClientProxyConnections,
+    announceForge,
+    forwardingMode,
+    forwardingSecret,
+    kickExisting,
+    pingPassthroughMode,
+    samplePlayersInPing,
+    enablePlayerAddressLogging,
+    new Servers(serversConfig),
+    new ForcedHosts(forcedHostsConfig),
+    new Advanced(advancedConfig),
+    new Security(securityConfig),      
+    new AntiDDoS(antiddosConfig),      
+    new AntiBot(antibotConfig),
+    new PacketFilter(packetFilterConfig),
+    new Query(queryConfig),
+    new Metrics(metricsConfig),
+    forceKeyAuthentication
+);
     }
   }
 
@@ -1097,7 +1122,7 @@ public static class PacketFilter {
           + ", showPlugins=" + showPlugins
           + '}';
     }
-  }
+  
 
   /**
    * Configuration for metrics.
@@ -1117,7 +1142,7 @@ public static class PacketFilter {
     }
   }
 }
+}
+
+
    
-
-
-   }
