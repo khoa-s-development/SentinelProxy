@@ -148,8 +148,8 @@ dependencies {
     testImplementation(libs.mockito)
 
     annotationProcessor(libs.auto.service)
-    implementation 'io.prometheus:simpleclient:0.16.0'
-    implementation 'io.prometheus:simpleclient_hotspot:0.16.0'
-    implementation 'com.squareup.okhttp3:okhttp:4.9.3'
-    implementation 'com.google.guava:guava:31.1-jre'
+    implementation("io.prometheus:simpleclient:0.16.0")
+    implementation("io.prometheus:simpleclient_hotspot:0.16.0")
+    implementation("com.squareup.okhttp3:okhttp:4.9.3")
+    implementation("com.google.guava:guava:31.1-jre")
 }
