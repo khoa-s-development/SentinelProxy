@@ -17,6 +17,7 @@ import java.net.InetSocketAddress;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.time.Duration;
 
 public class Layer4Detector {
     private static final Logger logger = LogManager.getLogger(Layer4Detector.class);

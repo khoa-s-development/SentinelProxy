@@ -115,7 +115,7 @@ public class VelocityConfiguration implements ProxyConfig {
 
   private VelocityConfiguration(String bind, String motd, int showMaxPlayers, boolean onlineMode,
             boolean preventClientProxyConnections, boolean announceForge, boolean forwardIp,
-            PlayerInfoForwardingMode playerInfoForwardingMode, Map<String, String> redirects,
+            PlayerInfoForwarding playerInfoForwarding, Map<String, String> redirects,
             int compressionThreshold, int compressionLevel, int loginRatelimit,
             boolean enablePlayerAddressLogging, boolean samplePlayersInPing,
             boolean announceProxyCommands, String favicon, Servers servers, 
@@ -128,14 +128,14 @@ public class VelocityConfiguration implements ProxyConfig {
     this.query = query;
     this.metrics = metrics;
     this.security = security();
-    this.antiddos = antiddos();
-    this.antibot = antibot();   
+    this.advancedAntiDDoSManager = antiddos();
+    this.advancedAntiBotHandler = antibot();   
     this.packetFilter = packetFilter();
   }
 
   private VelocityConfiguration(String bind, String motd, int showMaxPlayers, boolean onlineMode,
       boolean preventClientProxyConnections, boolean announceForge,
-      PlayerInfoForwarding playerInfoForwardingMode, byte[] forwardingSecret,
+      PlayerInfoForwarding playerInfoForwarding, byte[] forwardingSecret,
       boolean onlineModeKickExistingPlayers, PingPassthroughMode pingPassthrough,
       boolean samplePlayersInPing, boolean enablePlayerAddressLogging, Servers servers,
       ForcedHosts forcedHosts, Advanced advanced, Query query, Metrics metrics,
@@ -146,7 +146,7 @@ public class VelocityConfiguration implements ProxyConfig {
     this.onlineMode = onlineMode;
     this.preventClientProxyConnections = preventClientProxyConnections;
     this.announceForge = announceForge;
-    this.playerInfoForwardingMode = playerInfoForwardingMode;
+    this.playerInfoForwarding = playerInfoForwardingMode;
     this.forwardingSecret = forwardingSecret;
     this.onlineModeKickExistingPlayers = onlineModeKickExistingPlayers;
     this.pingPassthrough = pingPassthrough;
@@ -1142,7 +1142,6 @@ return new VelocityConfiguration(
       return enabled;
     }
   }
-}
 }
 
 

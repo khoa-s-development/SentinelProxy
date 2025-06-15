@@ -152,4 +152,5 @@ dependencies {
     implementation("io.prometheus:simpleclient_hotspot:0.16.0")
     implementation("com.squareup.okhttp3:okhttp:4.9.3")
     implementation("com.google.guava:guava:31.1-jre")
+    implementation ("org.apache.logging.log4j:log4j-core:2.14.1")
 }

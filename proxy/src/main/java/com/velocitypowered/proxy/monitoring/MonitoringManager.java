@@ -4,6 +4,7 @@ import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.Histogram;
 import io.prometheus.client.hotspot.DefaultExports;
+import com.velocitypowered.proxy.VelocityServer;
 
 public class MonitoringManager {
     private final VelocityServer server;

@@ -68,16 +68,16 @@ import com.velocitypowered.proxy.util.ResourceUtils;
 import com.velocitypowered.proxy.util.VelocityChannelRegistrar;
 import com.velocitypowered.proxy.util.ratelimit.Ratelimiter;
 import com.velocitypowered.proxy.util.ratelimit.Ratelimiters;
-import com.velocitypowered.proxy.security;
+import com.velocitypowered.proxy.security.*;
 import com.velocitypowered.proxy.security.SecurityManager;
 import com.velocitypowered.proxy.security.PacketFilterManager;
-import com.veloctitypowered.proxy.protection.AdvancedAntiBotHandler;
-import com.veloctitypowered.proxy.protection.AdvancedAntiDDoSManager;
-import com.veloctitypowered.proxy.protection.PacketExploitChecker;
+import com.velocitypowered.proxy.protection.AdvancedAntiBotHandler;
+import com.velocitypowered.proxy.protection.AdvancedAntiDDoSManager;
+import com.velocitypowered.proxy.protection.PacketExploitChecker;
 import com.velocitypowered.proxy.protection.*;
-import com.velocitypowered.proxy.anomaly;
-import com.velocitypowered.proxy.security.rules;
-import com.velocitypowered.proxy.security.store;
+import com.velocitypowered.proxy.anomaly.AnomalyDetector;
+import com.velocitypowered.proxy.security.rules.*;
+import com.velocitypowered.proxy.security.store.*;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -123,6 +123,8 @@ import org.checkerframework.checker.nullness.qual.EnsuresNonNull;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
+import java.time.Duration;
+import java.util.HashMap;
 
 /**
  * Implementation of {@link ProxyServer}.

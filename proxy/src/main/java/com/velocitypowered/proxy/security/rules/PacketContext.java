@@ -42,7 +42,18 @@ public class PacketContext {
     public PacketEvent getEvent() {
         return event;
     }
-
+    public Object getPacket() {
+        return event.getPacket();
+    }
+    
+    public String getPacketType() {
+        return event.getType();
+    }
+    
+    public long getTimestamp() {
+        return event.getTimestamp();
+    }
+}
     public MinecraftConnection getConnection() {
         return connection;
     }
@@ -54,7 +65,7 @@ public class PacketContext {
     public String getServerAddress() {
         return serverAddress;
     }
-
+    
     public InitialInboundConnection getInitialConnection() {
         if (connection instanceof InitialInboundConnection) {
             return (InitialInboundConnection) connection;

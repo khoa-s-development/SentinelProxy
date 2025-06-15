@@ -27,6 +27,7 @@ import com.velocitypowered.proxy.protocol.packet.PacketWrapper;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import com.velocitypowered.proxy.protocol.StateRegistry;
+import com.velocitypowered.proxy.protocol.ConnectionState;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.time.Duration;

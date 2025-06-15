@@ -44,7 +44,7 @@ import java.util.concurrent.Executors;
 @Plugin(
     id = "SentinelsProxy",
     name = "SentinelsProxy",
-    version = BuildConstants.VERSION,
+    version = "2.0.0",
     url = "https://zyndata.vn",
     description = "A Fully AntiDDoS , Anti Exploit, Modern and hotswaping Proxy.",
     authors = {"Velocity Team"}
@@ -60,7 +60,6 @@ public class Velocity {
     private final VelocityConfiguration configuration;
     private final ComponentRegistry componentRegistry;
     private final CommandRegistry commandRegistry;
-    private final EventRegistry eventRegistry;
 
     // Protection components 
     private final SecurityManager securityManager;
@@ -77,7 +76,6 @@ public class Velocity {
         this.configuration = new VelocityConfiguration(dataDirectory);
         this.componentRegistry = new ComponentRegistry(this);
         this.commandRegistry = new CommandRegistry(this);
-        this.eventRegistry = new EventRegistry(this);
 
         // Initialize protection components
         this.securityManager = new SecurityManager(this);
@@ -106,7 +104,7 @@ public class Velocity {
             // Schedule tasks
             scheduleTasks();
 
-            logger.info("Velocity {} has been initialized", BuildConstants.VERSION);
+            logger.info("Velocity Recoded has been initialized");
 
         } catch (Exception e) {
             logger.error("Failed to initialize Velocity", e);
@@ -145,13 +143,7 @@ public class Velocity {
         commandRegistry.registerCommand("monitor", new MonitorCommand(this));
         commandRegistry.registerCommand("server", new ServerCommand(this));
     }
-
-    private void registerEventHandlers() {
-        eventRegistry.registerHandler(new ConnectionEventHandler(this));
-        eventRegistry.registerHandler(new SecurityEventHandler(this));
-        eventRegistry.registerHandler(new MonitoringEventHandler(this));
-    }
-
+    
     private void startServices() {
         if (configuration.isApiEnabled()) {
             apiServer.start();

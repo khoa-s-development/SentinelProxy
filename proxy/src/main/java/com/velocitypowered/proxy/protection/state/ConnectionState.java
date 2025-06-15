@@ -31,6 +31,8 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.Map;
+import java.util.HashMap;
 
 public class ConnectionState {
     private static final Logger logger = LogManager.getLogger(ConnectionState.class);
@@ -282,4 +284,10 @@ public class ConnectionState {
     public int getViolations() {
         return violations.get();
     }
+    public enum ConnectionState {
+    HANDSHAKE,
+    STATUS,
+    LOGIN,
+    PLAY
+}
 }
