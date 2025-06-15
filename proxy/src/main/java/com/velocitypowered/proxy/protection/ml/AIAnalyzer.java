@@ -35,6 +35,9 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import com.google.common.cache.Cache; 
+import com.google.common.cache.CacheBuilder;
+import java.util.concurrent.TimeUnit;
 
 public class AIAnalyzer {
     private static final Logger logger = LogManager.getLogger(AIAnalyzer.class);

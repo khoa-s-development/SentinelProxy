@@ -32,6 +32,7 @@ import com.velocitypowered.proxy.config.VelocityConfiguration;
 import com.velocitypowered.proxy.protection.*;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import com.velocitypowered.proxy.monitoring.MonitoringManager;
 import org.slf4j.Logger;
 
 import java.nio.file.Path;
@@ -65,10 +66,6 @@ public class Velocity {
     private final SecurityManager securityManager;
     private final MonitoringManager monitoringManager;
 
-    // Additional services
-    private final ApiServer apiServer;
-    private final UpdateChecker updateChecker;
-
     @Inject
     public Velocity(ProxyServer server, Logger logger, @DataDirectory Path dataDirectory) {
         this.server = server;
@@ -86,9 +83,6 @@ public class Velocity {
         this.securityManager = new SecurityManager(this);
         this.monitoringManager = new MonitoringManager(this);
 
-        // Initialize services
-        this.apiServer = new ApiServer(this);
-        this.updateChecker = new UpdateChecker(this);
     }
 
     @Subscribe
@@ -269,8 +263,5 @@ public class Velocity {
     public EventRegistry getEventRegistry() {
         return eventRegistry;
     }
-
-    public ApiServer getApiServer() {
-        return apiServer;
-    }
+    
 }

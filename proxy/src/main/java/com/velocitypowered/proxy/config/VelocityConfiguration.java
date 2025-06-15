@@ -31,6 +31,11 @@ import com.velocitypowered.proxy.config.migration.ForwardingMigration;
 import com.velocitypowered.proxy.config.migration.KeyAuthenticationMigration;
 import com.velocitypowered.proxy.config.migration.MotdMigration;
 import com.velocitypowered.proxy.config.migration.TransferIntegrationMigration;
+import com.velocitypowered.proxy.config.ForcedHosts;
+import com.velocitypowered.proxy.config.Servers;
+import com.velocitypowered.proxy.config.Advanced;
+import com.velocitypowered.proxy.config.PlayerInfoForwarding;
+import com.velocitypowered.proxy.config.PingPassthroughMode;
 import com.velocitypowered.proxy.util.AddressUtil;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.IOException;
@@ -59,6 +64,8 @@ import java.util.Map;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+
+import com.velocitypowered.proxy.Metrics;
 /**
  * Velocity's configuration. Recoded from the ground up in 1.2.0, this class is responsible for
  * reading the configuration file, validating it, and providing access to the configuration
@@ -492,12 +499,6 @@ public static class PacketFilter {
   public int getTabCompleteRatelimit() {
     return advanced.getTabCompleteRateLimit();
   }
-
-  @Override
-  public int getKickAfterRateLimitedTabCompletes() {
-    return advanced.getKickAfterRateLimitedTabCompletes();
-  }
-
   @Override
   public boolean isForwardCommandsIfRateLimited() {
     return advanced.isForwardCommandsIfRateLimited();

@@ -26,7 +26,7 @@ import io.netty.channel.ChannelHandlerContext;
 import com.velocitypowered.proxy.protocol.packet.PacketWrapper;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
+import com.velocitypowered.proxy.protocol.StateRegistry;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.time.Duration;
@@ -75,7 +75,7 @@ public class BehaviorAnalyzer {
         this.maxEventsPerSession = 1000;
     }
 
-    public boolean analyzeBehavior(InetAddress address, ConnectionState state, PacketWrapper packet) {
+    public boolean analyzeBehavior(InetAddress address, StateRegistry.StateRegistry state, PacketWrapper packet)  {
         try {
             // Get or create behavior profile
             BehaviorProfile profile = profiles.computeIfAbsent(address,
@@ -330,4 +330,5 @@ public class BehaviorAnalyzer {
 
         return stats;
     }
+
 }

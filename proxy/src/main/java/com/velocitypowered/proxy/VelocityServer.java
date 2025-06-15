@@ -68,6 +68,16 @@ import com.velocitypowered.proxy.util.ResourceUtils;
 import com.velocitypowered.proxy.util.VelocityChannelRegistrar;
 import com.velocitypowered.proxy.util.ratelimit.Ratelimiter;
 import com.velocitypowered.proxy.util.ratelimit.Ratelimiters;
+import com.velocitypowered.proxy.security;
+import com.velocitypowered.proxy.security.SecurityManager;
+import com.velocitypowered.proxy.security.PacketFilterManager;
+import com.veloctitypowered.proxy.protection.AdvancedAntiBotHandler;
+import com.veloctitypowered.proxy.protection.AdvancedAntiDDoSManager;
+import com.veloctitypowered.proxy.protection.PacketExploitChecker;
+import com.velocitypowered.proxy.protection.*;
+import com.velocitypowered.proxy.anomaly;
+import com.velocitypowered.proxy.security.rules;
+import com.velocitypowered.proxy.security.store;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -172,8 +182,8 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
   private final VelocityChannelRegistrar channelRegistrar = new VelocityChannelRegistrar();
   private final ServerListPingHandler serverListPingHandler;
   private final SecurityManager securityManager;
-  private final AntiDDoSManager antiDDoSManager;
-  private final AntiBotManager antiBotManager;
+  private final AdvancedAntiDDoSManager advancedAntiDDoSManager;
+  private final AdvancedAntiBotHandler advancedAntiBotHandler;
   private final PacketFilterManager packetFilterManager;
   VelocityServer(final ProxyOptions options) {
     pluginManager = new VelocityPluginManager(this);
@@ -186,19 +196,19 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     serverListPingHandler = new ServerListPingHandler(this);
     this.options = options;
     this.securityManager = new SecurityManager(this);
-    this.antiDDoSManager = new AntiDDoSManager(this);
-    this.antiBotManager = new AntiBotManager(this);
+    this.advancedAntiDDoSManager = new AdvancedAntiDDoSManager(this);
+    this.advancedAntiBotHandler = new AdvancedAntiBotHandler(this);
     this.packetFilterManager = new PacketFilterManager(this); 
   }
 public SecurityManager getSecurityManager() {
     return securityManager;
 }
 
-public AntiDDoSManager getAntiDDoSManager() {
+public AdvancedAntiDDoSManager getAdvancedAntiDDoSManager() {
     return antiDDoSManager;
 }
 
-public AntiBotManager getAntiBotManager() {
+public AdvancedAntiBotHandler getAdvancedAntiBotHandler() {
     return antiBotManager;
 }
 
@@ -259,8 +269,8 @@ public PacketFilterManager getPacketFilterManager() {
     console.setupStreams();
     pluginManager.registerPlugin(this.createVirtualPlugin());
     securityManager.start();
-    antiDDoSManager.start();
-    antiBotManager.start();
+    advancedAntiBotHandler.start();
+    advancedAntiDDoSManager.start();
     packetFilterManager.start();
 
 
