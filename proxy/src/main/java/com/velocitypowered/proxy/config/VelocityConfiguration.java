@@ -1143,6 +1143,6 @@ return new VelocityConfiguration(
     }
   }
 }
-
+}
 
    

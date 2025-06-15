@@ -53,7 +53,7 @@ public class PacketContext {
     public long getTimestamp() {
         return event.getTimestamp();
     }
-}
+
     public MinecraftConnection getConnection() {
         return connection;
     }
