@@ -22,8 +22,34 @@ jobs:
     - name: Setup Gradle
       uses: gradle/gradle-build-action@v3
     
+    - name: Update Build Time
+      run: |
+        echo "/*
+         * Current Date and Time (UTC): $(date -u +%Y-%m-%d\ %H:%M:%S)
+         * Current User's Login: ${{ github.actor }}
+         */
+        
+        package com.velocitypowered.proxy;
+        
+        public final class BuildConstants {
+            public static final String VERSION = \"3.0.0\";
+            public static final String BUILD_TIME = \"$(date -u +%Y-%m-%d\ %H:%M:%S)\";
+            public static final String USER = \"${{ github.actor }}\";
+            
+            private BuildConstants() {}
+        }" > proxy/src/main/java/com/velocitypowered/proxy/BuildConstants.java
+
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
       
     - name: Build with Gradle
       run: ./gradlew build
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: SentinelProxy-${{ github.sha }}
+        path: |
+          proxy/build/libs/*.jar
+          LICENSE
+          README.md
