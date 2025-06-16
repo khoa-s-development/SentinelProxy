@@ -75,7 +75,7 @@ import com.velocitypowered.proxy.protection.AdvancedAntiBotHandler;
 import com.velocitypowered.proxy.protection.AdvancedAntiDDoSManager;
 import com.velocitypowered.proxy.protection.PacketExploitChecker;
 import com.velocitypowered.proxy.protection.*;
-import com.velocitypowered.proxy.anomaly.AnomalyDetector;
+import com.velocitypowered.proxy.protection.anomaly.AnomalyDetector;
 import com.velocitypowered.proxy.security.rules.*;
 import com.velocitypowered.proxy.security.store.*;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -207,11 +207,11 @@ public SecurityManager getSecurityManager() {
 }
 
 public AdvancedAntiDDoSManager getAdvancedAntiDDoSManager() {
-    return antiDDoSManager;
+    return advancedAntiDDoSManager;
 }
 
 public AdvancedAntiBotHandler getAdvancedAntiBotHandler() {
-    return antiBotManager;
+    return advancedAntiBotHandler;
 }
 
 public PacketFilterManager getPacketFilterManager() {
@@ -233,13 +233,13 @@ public PacketFilterManager getPacketFilterManager() {
     String implVersion;
     String implVendor;
     if (pkg != null) {
-      implName = MoreObjects.firstNonNull(pkg.getImplementationTitle(), "Velocity");
+      implName = MoreObjects.firstNonNull(pkg.getImplementationTitle(), "SentinelProxy");
       implVersion = MoreObjects.firstNonNull(pkg.getImplementationVersion(), "<unknown>");
-      implVendor = MoreObjects.firstNonNull(pkg.getImplementationVendor(), "Velocity Contributors");
+      implVendor = MoreObjects.firstNonNull(pkg.getImplementationVendor(), "khoasoma, akk1to dev");
     } else {
-      implName = "Velocity";
+      implName = "SentinelProxy";
       implVersion = "<unknown>";
-      implVendor = "Velocity Contributors";
+      implVendor = "khoasoma, akk1to dev";
     }
 
     return new ProxyVersion(implName, implVendor, implVersion);

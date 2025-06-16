@@ -29,6 +29,7 @@ import io.prometheus.client.Gauge;
 import io.prometheus.client.Histogram;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.velocitypowered.api.proxy.VelocityServer;
 
 import java.net.InetAddress;
 import java.time.Duration;
@@ -39,7 +40,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class AdvancedAntiDDoSManager {
     private static final Logger logger = LoggerFactory.getLogger(AdvancedAntiDDoSManager.class);
-
+    private final VelocityServer server;
     // Metrics
     private static final Counter ddosAttemptsTotal = Counter.build()
             .name("velocity_ddos_attempts_total")
@@ -83,7 +84,8 @@ public class AdvancedAntiDDoSManager {
     private Duration blacklistDuration;
     private boolean autoBlacklist;
 
-    public AdvancedAntiDDoSManager() {
+    public AdvancedAntiDDoSManager(VelocityServer server) {
+        this.server = server;
         // Initialize executors
         this.maintenanceExecutor = Executors.newSingleThreadScheduledExecutor(
             new ThreadFactoryBuilder()
@@ -118,7 +120,27 @@ public class AdvancedAntiDDoSManager {
         startMaintenanceTasks();
         startAIDataCollection();
     }
+    public void start() {
+        if (enabled) {
+            logger.info("Starting AntiBot protection in {} mode...", mode);
+        }
+    }
 
+    public void stop() {
+        logger.info("Stopping AntiBot protection...");
+        verificationAttempts.invalidateAll();
+        verificationTimes.clear();
+    }
+
+    public void reload() {
+        VelocityConfiguration.AntiBot config = server.getConfiguration().getAntiBot();
+        this.enabled = config.isEnabled();
+        this.mode = config.getMode();
+        this.verificationTimeout = config.getVerificationTimeout();
+        
+        logger.info("AntiBot Handler reloaded with mode={}, timeout={}s",
+            mode, verificationTimeout);
+    }
     public boolean handleConnection(ChannelHandlerContext ctx) {
         InetAddress address = getAddress(ctx);
 

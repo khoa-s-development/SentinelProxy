@@ -1,86 +1,99 @@
 /*
  * Copyright (C) 2018-2023 Velocity Contributors
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- * Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-06-14 11:48:00
+ * Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-06-15 13:38:06
  * Current User's Login: Khoasoma
  */
 
-package com.velocitypowered.proxy;
+package com.velocitypowered.proxy.command;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Maps;
-import com.velocitypowered.api.command.Command;
-import com.velocitypowered.api.command.CommandSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import com.google.common.base.Preconditions;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class CommandRegistry {
-    private static final Logger logger = LoggerFactory.getLogger(CommandRegistry.class);
-    private final Velocity velocity;
-    private final Map<String, Command> commands;
-    private final Map<String, String> aliases;
-    
-    public CommandRegistry(Velocity velocity) {
-        this.velocity = velocity;
-        this.commands = Maps.newHashMap();
-        this.aliases = Maps.newHashMap();
+    private static final Logger logger = LogManager.getLogger(CommandRegistry.class);
+    private final Map<String, Command> commands = new HashMap<>();
+
+    /**
+     * Interface for command sources that can execute commands.
+     */
+    public interface CommandSource {
+        void sendMessage(Component message);
+        boolean hasPermission(String permission);
+        default boolean isPlayer() {
+            return false;
+        }
     }
 
-    public void registerCommand(String name, Command command) {
-        commands.put(name.toLowerCase(), command);
-        velocity.getServer().getCommandManager().register(name, command);
-        logger.debug("Registered command: {}", name);
-    }
-
-    public void registerAlias(String alias, String command) {
-        alias = alias.toLowerCase();
-        command = command.toLowerCase();
+    /**
+     * Interface for commands that can be executed.
+     */
+    public interface Command {
+        void execute(CommandSource source, String[] args);
         
-        if (!commands.containsKey(command)) {
-            logger.warn("Cannot create alias {} for non-existent command {}", alias, command);
-            return;
+        default List<String> suggest(CommandSource source, String[] currentArgs) {
+            return List.of();
         }
-
-        aliases.put(alias, command);
-        velocity.getServer().getCommandManager().register(alias, commands.get(command));
-        logger.debug("Registered command alias: {} -> {}", alias, command);
+        
+        default boolean hasPermission(CommandSource source) {
+            return true;
+        }
     }
 
-    public Optional<Command> getCommand(String name) {
-        name = name.toLowerCase();
-        Command command = commands.get(name);
-        if (command == null) {
-            String aliasTarget = aliases.get(name);
-            if (aliasTarget != null) {
-                command = commands.get(aliasTarget);
-            }
+    /**
+     * Registers a command with the specified alias.
+     */
+    public void registerCommand(String alias, Command command) {
+        Preconditions.checkNotNull(alias, "alias");
+        Preconditions.checkNotNull(command, "command");
+        
+        if (commands.containsKey(alias)) {
+            logger.warn("Command '{}' is already registered, overriding...", alias);
         }
-        return Optional.ofNullable(command);
+        
+        commands.put(alias.toLowerCase(), command);
+        logger.info("Registered command: {}", alias);
     }
 
-    public boolean executeCommand(CommandSource source, String commandLine) {
-        String[] parts = commandLine.split(" ", 2);
-        String name = parts[0].toLowerCase();
-        String args = parts.length > 1 ? parts[1] : "";
+    /**
+     * Unregisters a command.
+     */
+    public Optional<Command> unregisterCommand(String alias) {
+        Preconditions.checkNotNull(alias, "alias");
+        Command removed = commands.remove(alias.toLowerCase());
+        if (removed != null) {
+            logger.info("Unregistered command: {}", alias);
+        }
+        return Optional.ofNullable(removed);
+    }
 
-        Optional<Command> command = getCommand(name);
-        if (!command.isPresent()) {
+    /**
+     * Executes a command for the specified source.
+     */
+    public boolean executeCommand(CommandSource source, String cmdLine) {
+        Preconditions.checkNotNull(source, "source");
+        Preconditions.checkNotNull(cmdLine, "cmdLine");
+
+        String[] split = cmdLine.split(" ", 2);
+        String alias = split[0].toLowerCase();
+        String args = split.length > 1 ? split[1] : "";
+
+        Optional<Command> command = getCommand(alias);
+        if (command.isEmpty()) {
+            source.sendMessage(Component.text("Unknown command.", NamedTextColor.RED));
+            return false;
+        }
+
+        if (!command.get().hasPermission(source)) {
+            source.sendMessage(Component.text("You do not have permission to use this command.", 
+                NamedTextColor.RED));
             return false;
         }
 
@@ -88,34 +101,48 @@ public class CommandRegistry {
             command.get().execute(source, args.split(" "));
             return true;
         } catch (Exception e) {
-            logger.error("Error executing command: {}", name, e);
+            logger.error("Error executing command '{}' for {}", alias, source, e);
+            source.sendMessage(Component.text("An error occurred while executing this command.", 
+                NamedTextColor.RED));
             return false;
         }
     }
 
-    public void unregisterCommand(String name) {
-        name = name.toLowerCase();
-        commands.remove(name);
-        velocity.getServer().getCommandManager().unregister(name);
-        
-        // Remove any aliases pointing to this command
-        aliases.entrySet().removeIf(entry -> entry.getValue().equals(name));
-        logger.debug("Unregistered command: {}", name);
+    /**
+     * Gets a registered command.
+     */
+    public Optional<Command> getCommand(String alias) {
+        Preconditions.checkNotNull(alias, "alias");
+        return Optional.ofNullable(commands.get(alias.toLowerCase()));
     }
 
-    public ImmutableList<String> getRegisteredCommands() {
-        return ImmutableList.copyOf(commands.keySet());
-    }
+    /**
+     * Gets suggestions for command completion.
+     */
+    public List<String> suggest(CommandSource source, String cmdLine) {
+        Preconditions.checkNotNull(source, "source");
+        Preconditions.checkNotNull(cmdLine, "cmdLine");
 
-    public ImmutableList<String> getCommandAliases() {
-        return ImmutableList.copyOf(aliases.keySet());
-    }
+        String[] split = cmdLine.split(" ", -1);
+        String alias = split[0].toLowerCase();
 
-    public void clearCommands() {
-        commands.keySet().forEach(name -> 
-            velocity.getServer().getCommandManager().unregister(name));
-        commands.clear();
-        aliases.clear();
-        logger.info("Cleared all registered commands");
+        Optional<Command> command = getCommand(alias);
+        if (command.isEmpty()) {
+            return commands.keySet().stream()
+                .filter(cmd -> cmd.startsWith(alias))
+                .filter(cmd -> {
+                    Command cmd2 = commands.get(cmd);
+                    return cmd2 != null && cmd2.hasPermission(source);
+                })
+                .toList();
+        }
+
+        if (!command.get().hasPermission(source)) {
+            return List.of();
+        }
+
+        String[] args = new String[split.length - 1];
+        System.arraycopy(split, 1, args, 0, args.length);
+        return command.get().suggest(source, args);
     }
 }

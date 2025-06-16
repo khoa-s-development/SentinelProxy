@@ -34,13 +34,17 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import com.velocitypowered.proxy.monitoring.MonitoringManager;
 import org.slf4j.Logger;
+import com.velocitypowered.proxy.command.*;
 
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.Executors;
-
+import com.velocitypowered.proxy.command.VelocityCommand;
+import com.velocitypowered.proxy.command.SecurityCommand;
+import com.velocitypowered.proxy.command.MonitorCommand;
+import com.velocitypowered.proxy.command.ServerCommand;
 @Plugin(
     id = "SentinelsProxy",
     name = "SentinelsProxy",

@@ -114,26 +114,6 @@ public class VelocityConfiguration implements ProxyConfig {
   private boolean forceKeyAuthentication = true; // Added in 1.19
 
   private VelocityConfiguration(String bind, String motd, int showMaxPlayers, boolean onlineMode,
-            boolean preventClientProxyConnections, boolean announceForge, boolean forwardIp,
-            PlayerInfoForwarding playerInfoForwarding, Map<String, String> redirects,
-            int compressionThreshold, int compressionLevel, int loginRatelimit,
-            boolean enablePlayerAddressLogging, boolean samplePlayersInPing,
-            boolean announceProxyCommands, String favicon, Servers servers, 
-            ForcedHosts forcedHosts, Advanced advanced, Security security,
-            AntiDDoS antiddos, AntiBot antibot, PacketFilter packetFilter,
-            Query query, Metrics metrics) {
-    this.servers = servers;
-    this.forcedHosts = forcedHosts;
-    this.advanced = advanced;
-    this.query = query;
-    this.metrics = metrics;
-    this.security = security();
-    this.advancedAntiDDoSManager = antiddos();
-    this.advancedAntiBotHandler = antibot();   
-    this.packetFilter = packetFilter();
-  }
-
-  private VelocityConfiguration(String bind, String motd, int showMaxPlayers, boolean onlineMode,
       boolean preventClientProxyConnections, boolean announceForge,
       PlayerInfoForwarding playerInfoForwarding, byte[] forwardingSecret,
       boolean onlineModeKickExistingPlayers, PingPassthroughMode pingPassthrough,
@@ -158,10 +138,10 @@ public class VelocityConfiguration implements ProxyConfig {
     this.query = query;
     this.metrics = metrics;
     this.forceKeyAuthentication = forceKeyAuthentication;
-    this.security = security();
-    this.antiddos = antiddos();
-    this.antibot = antibot();
-    this.packetFilter = packetFilter();
+    this.security = security;
+    this.antiddos = antiddos;
+    this.antibot = antibot;
+    this.packetFilter = packetFilter;
   }
 public static class Security {
     @Expose private boolean advancedProtection = true;
@@ -568,7 +548,21 @@ public static class PacketFilter {
   public boolean isForceKeyAuthentication() {
     return forceKeyAuthentication;
   }
+   public Security getSecurity() {
+        return security;
+    }
 
+    public AntiDDoS getAntiDDoS() {
+        return antiddos; 
+    }
+
+    public AntiBot getAntiBot() {
+        return antibot;
+    }
+
+    public PacketFilter getPacketFilter() {
+        return packetFilter;
+    }
   public boolean isEnableReusePort() {
     return advanced.isEnableReusePort();
   }
@@ -608,11 +602,10 @@ public static class PacketFilter {
     if (defaultConfigLocation == null) {
       throw new RuntimeException("Default configuration file does not exist.");
     }
-    CommentedConfig securityConfig = config.get("security");
-    CommentedConfig antiddosConfig = config.get("antiddos");
-    CommentedConfig antibotConfig = config.get("antibot"); 
-    CommentedConfig packetFilterConfig = config.get("packet-filter");
-
+    Security security = new Security(securityConfig);
+    AntiDDoS antiddos = new AntiDDoS(antiddosConfig);
+    AntiBot antibot = new AntiBot(antibotConfig);
+    PacketFilter packetFilter = new PacketFilter(packetFilterConfig);
     // Timezone
     String timestamp = LocalDateTime.now(ZoneOffset.UTC)
         .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
@@ -1095,21 +1088,7 @@ return new VelocityConfiguration(
     public String getQueryMap() {
       return queryMap;
     }
-    public Security getSecurity() {
-        return security;
-    }
 
-    public AntiDDoS getAntiDDoS() {
-        return antiddos; 
-    }
-
-    public AntiBot getAntiBot() {
-        return antibot;
-    }
-
-    public PacketFilter getPacketFilter() {
-        return packetFilter;
-    }
     public boolean shouldQueryShowPlugins() {
       return showPlugins;
     }
