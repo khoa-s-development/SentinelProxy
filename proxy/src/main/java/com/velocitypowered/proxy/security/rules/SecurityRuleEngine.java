@@ -9,7 +9,9 @@ package com.velocitypowered.proxy.security.rules;
 
 import com.velocitypowered.api.event.connection.ConnectionHandshakeEvent;
 import com.velocitypowered.api.proxy.Player;
-import com.velocitypowered.api.proxy.crypto.IdentifiedKey; 
+import com.velocitypowered.api.proxy.security.*;
+import com.velocitypowered.api.proxy.security.rules.*;
+import com.velocitypowered.api.proxy.crypto.IdentifiedKey;
 import com.velocitypowered.proxy.connection.client.ConnectedPlayer;
 import com.velocitypowered.proxy.protocol.packet.HandshakePacket;
 import io.netty.channel.ChannelHandlerContext;
@@ -20,7 +22,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Pattern;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
 public class SecurityRuleEngine {
     private static final Logger logger = LogManager.getLogger(SecurityRuleEngine.class);
 
@@ -41,9 +45,9 @@ public class SecurityRuleEngine {
 
     public SecurityRuleEngine() {
         // Initialize rule collections
-        this.connectionRules = new CopyOnWriteArrayList<>();
-        this.packetRules = new CopyOnWriteArrayList<>();
-        this.playerRules = new CopyOnWriteArrayList<>();
+        this.connectionRules = new ArrayList<>();
+        this.packetRules = new ArrayList<>();
+        this.playerRules = new ArrayList<>();
         this.packetPatterns = new ConcurrentHashMap<>();
 
         // Initialize tracking
