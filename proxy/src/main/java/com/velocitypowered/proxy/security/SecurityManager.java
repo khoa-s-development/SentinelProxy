@@ -26,6 +26,7 @@ import com.velocitypowered.proxy.protocol.packet.LoginPacket;
 import com.velocitypowered.proxy.security.crypto.EncryptionManager;
 import com.velocitypowered.proxy.security.store.SecurityStore;
 import com.velocitypowered.proxy.security.rules.SecurityRuleEngine;
+import com.velocitypowered.api.event.connection.LoginEvent;
 
 import java.net.InetAddress;
 import java.util.concurrent.CompletableFuture;
@@ -102,11 +103,11 @@ public class SecurityManager {
         // Validate player on login
         try {
             if (!validatePlayer(event.getPlayer())) {
-                event.setResult(LoginEvent.LoginResult.denied());
+                event.setResult(LoginEvent.ComponentResult.denied(Component.text("Access denied")));
             }
         } catch (Exception e) {
             logger.error("Error validating player login", e);
-            event.setResult(LoginEvent.LoginResult.denied());
+            event.setResult(LoginEvent.ComponentResult.denied(Component.text("Access denied")));
         }
     }
 

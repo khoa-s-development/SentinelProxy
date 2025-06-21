@@ -13,9 +13,6 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- * Current Date and Time (UTC): 2025-06-21 02:05:19
- * Current User's Login: akk1to
  */
 
 package com.velocitypowered.proxy;
@@ -27,16 +24,17 @@ import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
 import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.ProxyServer;
+import com.velocitypowered.proxy.command.*;
 import com.velocitypowered.proxy.config.VelocityConfiguration;
 import com.velocitypowered.proxy.protection.*;
-import com.velocitypowered.proxy.monitoring.MonitoringManager;
-import com.velocitypowered.proxy.command.builtin.VelocityCommand;
-import com.velocitypowered.proxy.command.builtin.ServerCommand;
+import com.velocitypowered.proxy.security.SecurityManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import com.velocitypowered.proxy.monitoring.MonitoringManager;
 import org.slf4j.Logger;
 
 import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.Executors;
@@ -57,16 +55,16 @@ public class Velocity {
     private final ScheduledExecutorService scheduler;
 
     // Core components
-    private VelocityConfiguration configuration;
-    private ComponentRegistry componentRegistry;
-    private CommandRegistry commandRegistry;
-    private EventRegistry eventRegistry;
+    private final VelocityConfiguration configuration;
+    private final ComponentRegistry componentRegistry;
+    private final CommandRegistry commandRegistry;
+    private final EventRegistry eventRegistry; // Add this field
 
     // Protection components 
-    private SecurityManager securityManager;
-    private MonitoringManager monitoringManager;
-
-    // Missing fields
+    private final SecurityManager securityManager;
+    private final MonitoringManager monitoringManager;
+    
+    // Add missing fields
     private ApiServer apiServer;
     private UpdateChecker updateChecker;
 
@@ -76,18 +74,30 @@ public class Velocity {
         this.logger = logger;
         this.dataDirectory = dataDirectory;
         this.scheduler = Executors.newScheduledThreadPool(4);
+
+        // Initialize core components
+        this.configuration = new VelocityConfiguration(dataDirectory);
+        this.componentRegistry = new ComponentRegistry(this);
+        this.commandRegistry = new CommandRegistry(this);
+        this.eventRegistry = new EventRegistry(this); // Initialize this
+
+        // Initialize protection components
+        this.securityManager = new SecurityManager(this);
+        this.monitoringManager = new MonitoringManager(this);
+        
+        // Initialize missing components
+        this.apiServer = new ApiServer(this);
+        this.updateChecker = new UpdateChecker(this);
     }
 
     @Subscribe
     public void onProxyInitialize(ProxyInitializeEvent event) {
         try {
-            // Initialize core components first
-            initializeComponents();
-
             // Load configuration
-            if (configuration != null) {
-                configuration.load();
-            }
+            configuration.load();
+
+            // Initialize components
+            initializeComponents();
 
             // Register commands
             registerCommands();
@@ -129,71 +139,29 @@ public class Velocity {
     }
 
     private void initializeComponents() {
-        try {
-            // Initialize configuration first
-            this.configuration = VelocityConfiguration.read(dataDirectory.resolve("velocity.toml"));
-            
-            // Initialize other components
-            this.componentRegistry = new ComponentRegistry(this);
-            this.commandRegistry = new CommandRegistry(this);
-            this.eventRegistry = new EventRegistry(this);
-            this.securityManager = new SecurityManager();
-            this.monitoringManager = new MonitoringManager(server);
-            
-            // Initialize missing components
-            this.apiServer = new ApiServer();
-            this.updateChecker = new UpdateChecker();
-
-            // Initialize components
-            if (componentRegistry != null) {
-                componentRegistry.initialize();
-            }
-            if (securityManager != null) {
-                securityManager.initialize();
-            }
-            if (monitoringManager != null) {
-                monitoringManager.initialize();
-            }
-        } catch (Exception e) {
-            logger.error("Failed to initialize components", e);
-        }
+        componentRegistry.initialize();
+        securityManager.initialize();
+        monitoringManager.initialize();
     }
 
     private void registerCommands() {
-        try {
-            if (server instanceof VelocityServer velocityServer) {
-                // Register built-in commands using the existing builtin classes
-                server.getCommandManager().register(VelocityCommand.create(velocityServer));
-                server.getCommandManager().register(ServerCommand.create(server));
-                
-                // Register custom commands
-                registerCustomCommands();
-            }
-        } catch (Exception e) {
-            logger.error("Failed to register commands", e);
-        }
-    }
-    
-    private void registerCustomCommands() {
-        // Register custom security and monitoring commands here
-        // These will be created as needed
+        commandRegistry.registerCommand("velocity", new VelocityCommand(this));
+        commandRegistry.registerCommand("security", new SecurityCommand(this));
+        commandRegistry.registerCommand("monitor", new MonitorCommand(this));
+        commandRegistry.registerCommand("server", new ServerCommand(this));
     }
     
     private void registerEventHandlers() {
-        // Register event handlers here if needed
+        // Add event handler registration if needed
     }
     
     private void startServices() {
-        try {
-            if (configuration != null && configuration.isApiEnabled() && apiServer != null) {
-                apiServer.start();
-            }
+        if (configuration.isApiEnabled()) {
+            apiServer.start();
+        }
 
-            if (configuration != null && configuration.isMonitoringEnabled() && monitoringManager != null) {
-                monitoringManager.start();
-            }
-        } catch (Exception e) {
-            logger.error("Failed to start services", e);
+        if (configuration.isMonitoringEnabled()) {
+            monitoringManager.start();
         }
     }
 
@@ -210,13 +178,11 @@ public class Velocity {
     }
 
     private void checkForUpdates() {
-        if (updateChecker != null) {
-            updateChecker.checkForUpdates().thenAccept(updateAvailable -> {
-                if (updateAvailable) {
-                    notifyUpdateAvailable();
-                }
-            });
-        }
+        updateChecker.checkForUpdates().thenAccept(updateAvailable -> {
+            if (updateAvailable) {
+                notifyUpdateAvailable();
+            }
+        });
     }
 
     private void notifyUpdateAvailable() {
@@ -233,15 +199,9 @@ public class Velocity {
     }
 
     private void performCleanup() {
-        if (securityManager != null) {
-            securityManager.cleanup();
-        }
-        if (monitoringManager != null) {
-            monitoringManager.cleanup();
-        }
-        if (componentRegistry != null) {
-            componentRegistry.cleanup();
-        }
+        securityManager.cleanup();
+        monitoringManager.cleanup();
+        componentRegistry.cleanup();
     }
 
     private void stopServices() {
@@ -257,15 +217,9 @@ public class Velocity {
     }
 
     private void saveData() {
-        if (configuration != null) {
-            configuration.save();
-        }
-        if (componentRegistry != null) {
-            componentRegistry.saveData();
-        }
-        if (securityManager != null) {
-            securityManager.saveData();
-        }
+        configuration.save();
+        componentRegistry.saveData();
+        securityManager.saveData();
     }
 
     private void cleanup() {

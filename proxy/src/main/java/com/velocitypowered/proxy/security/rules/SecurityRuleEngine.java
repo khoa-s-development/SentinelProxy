@@ -29,9 +29,9 @@ public class SecurityRuleEngine {
     private static final Logger logger = LogManager.getLogger(SecurityRuleEngine.class);
 
     // Rule Collections 
-    private final List<SecurityRule<ConnectionContext>> connectionRules;
-    private final List<SecurityRule<PacketContext>> packetRules;
-    private final List<SecurityRule<PlayerContext>> playerRules;
+    private final List<SecurityRule> connectionRules;
+    private final List<SecurityRule> packetRules;  
+    private final List<SecurityRule> playerRules;
     private final Map<String, Pattern> packetPatterns;
 
     // Configuration

@@ -30,6 +30,11 @@ import io.prometheus.client.Histogram;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.velocitypowered.api.proxy.VelocityServer;
+import java.net.InetSocketAddress;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import java.util.concurrent.ConcurrentHashMap;
+import java.time.Duration;
 
 import java.net.InetAddress;
 import java.time.Duration;
@@ -41,6 +46,20 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class AdvancedAntiDDoSManager {
     private static final Logger logger = LoggerFactory.getLogger(AdvancedAntiDDoSManager.class);
     private final VelocityServer server;
+    private boolean enabled = true;
+    private String mode = "NORMAL";
+    private Duration verificationTimeout = Duration.ofSeconds(30);
+    private final Cache<String, Integer> verificationAttempts;
+    private final ConcurrentHashMap<String, Long> verificationTimes;
+    public AdvancedAntiDDoSManager(VelocityServer server) {
+        this.server = server;
+        this.logger = server.getLogger();
+        this.verificationAttempts = Caffeine.newBuilder()
+            .maximumSize(10000)
+            .expireAfterWrite(Duration.ofMinutes(10))
+            .build();
+        this.verificationTimes = new ConcurrentHashMap<>();
+    }
     // Metrics
     private static final Counter ddosAttemptsTotal = Counter.build()
             .name("velocity_ddos_attempts_total")

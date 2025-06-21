@@ -18,6 +18,8 @@
 package com.velocitypowered.proxy;
 
 import com.google.common.base.MoreObjects;
+import java.net.InetSocketAddress;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.gson.Gson;
@@ -134,6 +136,7 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
   public static final String VELOCITY_URL = "https://velocitypowered.com";
 
   private static final Logger logger = LogManager.getLogger(VelocityServer.class);
+  
   public static final Gson GENERAL_GSON = new GsonBuilder()
       .registerTypeHierarchyAdapter(Favicon.class, FaviconSerializer.INSTANCE)
       .registerTypeHierarchyAdapter(GameProfile.class, GameProfileSerializer.INSTANCE)
@@ -184,8 +187,8 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
   private final VelocityChannelRegistrar channelRegistrar = new VelocityChannelRegistrar();
   private final ServerListPingHandler serverListPingHandler;
   private final SecurityManager securityManager;
-  private final AdvancedAntiDDoSManager advancedAntiDDoSManager;
-  private final AdvancedAntiBotHandler advancedAntiBotHandler;
+  private final AdvancedAntiDDoSManager antiDDoSManager;
+  private final AdvancedAntiBotHandler antiBotManager;
   private final PacketFilterManager packetFilterManager;
   VelocityServer(final ProxyOptions options) {
     pluginManager = new VelocityPluginManager(this);
@@ -198,21 +201,21 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     serverListPingHandler = new ServerListPingHandler(this);
     this.options = options;
     this.securityManager = new SecurityManager(this);
-    this.advancedAntiDDoSManager = new AdvancedAntiDDoSManager(this);
-    this.advancedAntiBotHandler = new AdvancedAntiBotHandler(this);
+    this.antiDDoSManager = new AdvancedAntiDDoSManager(this);
+    this.antiBotManager = new AdvancedAntiBotHandler(this);
     this.packetFilterManager = new PacketFilterManager(this); 
   }
 public SecurityManager getSecurityManager() {
     return securityManager;
 }
 
-public AdvancedAntiDDoSManager getAdvancedAntiDDoSManager() {
-    return advancedAntiDDoSManager;
-}
-
-public AdvancedAntiBotHandler getAdvancedAntiBotHandler() {
-    return advancedAntiBotHandler;
-}
+public AdvancedAntiDDoSManager getAntiDDoSManager() {
+      return antiDDoSManager;
+    }
+    
+public AdvancedAntiBotHandler getAntiBotManager() {
+      return antiBotManager;
+    }
 
 public PacketFilterManager getPacketFilterManager() {
     return packetFilterManager;
@@ -271,8 +274,8 @@ public PacketFilterManager getPacketFilterManager() {
     console.setupStreams();
     pluginManager.registerPlugin(this.createVirtualPlugin());
     securityManager.start();
-    advancedAntiBotHandler.start();
-    advancedAntiDDoSManager.start();
+    antiBotManager.start();
+    antiDDoSManager.start();
     packetFilterManager.start();
 
 
