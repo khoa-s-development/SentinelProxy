@@ -17,253 +17,73 @@
 
 package com.velocitypowered.proxy;
 
-import com.google.inject.Inject;
-import com.velocitypowered.api.event.Subscribe;
-import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
-import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
-import com.velocitypowered.api.plugin.Plugin;
-import com.velocitypowered.api.plugin.annotation.DataDirectory;
-import com.velocitypowered.api.proxy.ProxyServer;
-import com.velocitypowered.proxy.command.*;
-import com.velocitypowered.proxy.config.VelocityConfiguration;
-import com.velocitypowered.proxy.protection.*;
-import com.velocitypowered.proxy.security.SecurityManager;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import com.velocitypowered.proxy.monitoring.MonitoringManager;
-import org.slf4j.Logger;
-
-import java.nio.file.Path;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ScheduledExecutorService;
+import com.velocitypowered.proxy.util.VelocityProperties;
+import io.netty.util.ResourceLeakDetector;
+import io.netty.util.ResourceLeakDetector.Level;
+import java.text.DecimalFormat;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.Executors;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-@Plugin(
-    id = "SentinelsProxy",
-    name = "SentinelsProxy",
-    version = "2.0.0",
-    url = "https://zyndata.vn",
-    description = "A Fully AntiDDoS , Anti Exploit, Modern and hotswaping Proxy.",
-    authors = {"Velocity Team"}
-)
+/**
+ * The main class. Responsible for parsing command line arguments and then launching the
+ * proxy.
+ */
 public class Velocity {
 
-    private final ProxyServer server;
-    private final Logger logger;
-    private final Path dataDirectory;
-    private final ScheduledExecutorService scheduler;
+  private static final Logger logger;
 
-    // Core components
-    private final VelocityConfiguration configuration;
-    private final ComponentRegistry componentRegistry;
-    private final CommandRegistry commandRegistry;
-    private final EventRegistry eventRegistry; // Add this field
+  static {
+    System.setProperty("java.util.logging.manager", "org.apache.logging.log4j.jul.LogManager");
+    logger = LogManager.getLogger(Velocity.class);
 
-    // Protection components 
-    private final SecurityManager securityManager;
-    private final MonitoringManager monitoringManager;
-    
-    // Add missing fields
-    private ApiServer apiServer;
-    private UpdateChecker updateChecker;
+    // We use BufferedImage for favicons, and on macOS this puts the Java application in the dock.
+    // How inconvenient. Force AWT to work with its head chopped off.
+    System.setProperty("java.awt.headless", "true");
 
-    @Inject
-    public Velocity(ProxyServer server, Logger logger, @DataDirectory Path dataDirectory) {
-        this.server = server;
-        this.logger = logger;
-        this.dataDirectory = dataDirectory;
-        this.scheduler = Executors.newScheduledThreadPool(4);
-
-        // Initialize core components
-        this.configuration = new VelocityConfiguration(dataDirectory);
-        this.componentRegistry = new ComponentRegistry(this);
-        this.commandRegistry = new CommandRegistry(this);
-        this.eventRegistry = new EventRegistry(this); // Initialize this
-
-        // Initialize protection components
-        this.securityManager = new SecurityManager(this);
-        this.monitoringManager = new MonitoringManager(this);
-        
-        // Initialize missing components
-        this.apiServer = new ApiServer(this);
-        this.updateChecker = new UpdateChecker(this);
+    // If Velocity's natives are being extracted to a different temporary directory, make sure the
+    // Netty natives are extracted there as well
+    if (VelocityProperties.hasProperty("velocity.natives-tmpdir")) {
+      System.setProperty("io.netty.native.workdir", System.getProperty("velocity.natives-tmpdir"));
     }
 
-    @Subscribe
-    public void onProxyInitialize(ProxyInitializeEvent event) {
-        try {
-            // Load configuration
-            configuration.load();
-
-            // Initialize components
-            initializeComponents();
-
-            // Register commands
-            registerCommands();
-
-            // Register event handlers
-            registerEventHandlers();
-
-            // Start services
-            startServices();
-
-            // Schedule tasks
-            scheduleTasks();
-
-            logger.info("Velocity Recoded has been initialized");
-
-        } catch (Exception e) {
-            logger.error("Failed to initialize Velocity", e);
-            throw new RuntimeException("Failed to initialize Velocity", e);
-        }
+    // Restore allocator used before Netty 4.2 due to oom issues with the adaptive allocator
+    if (System.getProperty("io.netty.allocator.type") == null) {
+      System.setProperty("io.netty.allocator.type", "pooled");
     }
 
-    @Subscribe 
-    public void onProxyShutdown(ProxyShutdownEvent event) {
-        try {
-            // Stop services
-            stopServices();
+    // Disable the resource leak detector by default as it reduces performance. Allow the user to
+    // override this if desired.
+    if (!VelocityProperties.hasProperty("io.netty.leakDetection.level")) {
+      ResourceLeakDetector.setLevel(Level.DISABLED);
+    }
+  }
 
-            // Save data
-            saveData();
-
-            // Cleanup resources
-            cleanup();
-
-            logger.info("Velocity has been shutdown");
-
-        } catch (Exception e) {
-            logger.error("Error during shutdown", e);
-        }
+  /**
+   * Main method that the JVM will call when {@code java -jar velocity.jar} is executed.
+   *
+   * @param args the arguments to the proxy
+   */
+  public static void main(String... args) {
+    final ProxyOptions options = new ProxyOptions(args);
+    if (options.isHelp()) {
+      return;
     }
 
-    private void initializeComponents() {
-        componentRegistry.initialize();
-        securityManager.initialize();
-        monitoringManager.initialize();
-    }
+    long startTime = System.nanoTime();
 
-    private void registerCommands() {
-        commandRegistry.registerCommand("velocity", new VelocityCommand(this));
-        commandRegistry.registerCommand("security", new SecurityCommand(this));
-        commandRegistry.registerCommand("monitor", new MonitorCommand(this));
-        commandRegistry.registerCommand("server", new ServerCommand(this));
-    }
-    
-    private void registerEventHandlers() {
-        // Add event handler registration if needed
-    }
-    
-    private void startServices() {
-        if (configuration.isApiEnabled()) {
-            apiServer.start();
-        }
+    VelocityServer server = new VelocityServer(options);
+    server.start();
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> server.shutdown(false),
+        "Shutdown thread"));
 
-        if (configuration.isMonitoringEnabled()) {
-            monitoringManager.start();
-        }
-    }
+    double bootTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime) / 1000d;
+    logger.info("Done ({}s)!", new DecimalFormat("#.##").format(bootTime));
+    server.getConsoleCommandSource().start();
 
-    private void scheduleTasks() {
-        // Update checker
-        scheduler.scheduleWithFixedDelay(() -> {
-            checkForUpdates();
-        }, 1, 24, TimeUnit.HOURS);
-
-        // Cleanup task
-        scheduler.scheduleWithFixedDelay(() -> {
-            performCleanup();
-        }, 5, 5, TimeUnit.MINUTES);
-    }
-
-    private void checkForUpdates() {
-        updateChecker.checkForUpdates().thenAccept(updateAvailable -> {
-            if (updateAvailable) {
-                notifyUpdateAvailable();
-            }
-        });
-    }
-
-    private void notifyUpdateAvailable() {
-        logger.info("A new version of Velocity is available!");
-        
-        Component message = Component.text()
-            .content("A new version of Velocity is available!")
-            .color(NamedTextColor.GREEN)
-            .build();
-
-        server.getAllPlayers().stream()
-            .filter(player -> player.hasPermission("velocity.admin"))
-            .forEach(player -> player.sendMessage(message));
-    }
-
-    private void performCleanup() {
-        securityManager.cleanup();
-        monitoringManager.cleanup();
-        componentRegistry.cleanup();
-    }
-
-    private void stopServices() {
-        if (apiServer != null) {
-            apiServer.stop();
-        }
-
-        if (monitoringManager != null) {
-            monitoringManager.stop();
-        }
-
-        scheduler.shutdown();
-    }
-
-    private void saveData() {
-        configuration.save();
-        componentRegistry.saveData();
-        securityManager.saveData();
-    }
-
-    private void cleanup() {
-        try {
-            scheduler.awaitTermination(5, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    // Getters
-    public ProxyServer getServer() {
-        return server;
-    }
-
-    public Logger getLogger() {
-        return logger; 
-    }
-
-    public Path getDataDirectory() {
-        return dataDirectory;
-    }
-
-    public VelocityConfiguration getConfiguration() {
-        return configuration;
-    }
-
-    public SecurityManager getSecurityManager() {
-        return securityManager;
-    }
-
-    public MonitoringManager getMonitoringManager() {
-        return monitoringManager;
-    }
-
-    public ComponentRegistry getComponentRegistry() {
-        return componentRegistry;
-    }
-
-    public CommandRegistry getCommandRegistry() {
-        return commandRegistry;
-    }
-
-    public EventRegistry getEventRegistry() {
-        return eventRegistry;
-    }
+    // If we don't have a console available (because SimpleTerminalConsole returned), then we still
+    // need to wait, otherwise the JVM will reap us as no non-daemon threads will be active once the
+    // main thread exits.
+    server.awaitProxyShutdown();
+  }
 }

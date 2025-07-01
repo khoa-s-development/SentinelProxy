@@ -51,30 +51,18 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
-
-import com.velocitypowered.proxy.Metrics;
 
 /**
- * Velocity's configuration. Recoded from the ground up in 1.2.0, this class is responsible for
- * reading the configuration file, validating it, and providing access to the configuration
+ * Velocity's configuration.
  */
 public class VelocityConfiguration implements ProxyConfig {
 
   private static final Logger logger = LogManager.getLogger(VelocityConfiguration.class);
 
-  @Expose private final Security security; 
-  @Expose private final AntiDDoS antiddos;
-  @Expose private final AntiBot antibot;
-  @Expose private final PacketFilter packetFilter;
   @Expose
   private String bind = "0.0.0.0:25565";
   @Expose
-  private String motd = "<aqua>A Proxy v11 Velocity Server";
+  private String motd = "<aqua>A Velocity Server";
   @Expose
   private int showMaxPlayers = 500;
   @Expose
@@ -106,21 +94,29 @@ public class VelocityConfiguration implements ProxyConfig {
   @Expose
   private boolean forceKeyAuthentication = true; // Added in 1.19
 
+  private VelocityConfiguration(Servers servers, ForcedHosts forcedHosts, Advanced advanced,
+      Query query, Metrics metrics) {
+    this.servers = servers;
+    this.forcedHosts = forcedHosts;
+    this.advanced = advanced;
+    this.query = query;
+    this.metrics = metrics;
+  }
+
   private VelocityConfiguration(String bind, String motd, int showMaxPlayers, boolean onlineMode,
       boolean preventClientProxyConnections, boolean announceForge,
-      PlayerInfoForwarding playerInfoForwarding, byte[] forwardingSecret,
+      PlayerInfoForwarding playerInfoForwardingMode, byte[] forwardingSecret,
       boolean onlineModeKickExistingPlayers, PingPassthroughMode pingPassthrough,
       boolean samplePlayersInPing, boolean enablePlayerAddressLogging, Servers servers,
       ForcedHosts forcedHosts, Advanced advanced, Query query, Metrics metrics,
-      boolean forceKeyAuthentication, Security security, AntiDDoS antiddos, 
-      AntiBot antibot, PacketFilter packetFilter) {
+      boolean forceKeyAuthentication) {
     this.bind = bind;
     this.motd = motd;
     this.showMaxPlayers = showMaxPlayers;
     this.onlineMode = onlineMode;
     this.preventClientProxyConnections = preventClientProxyConnections;
     this.announceForge = announceForge;
-    this.playerInfoForwardingMode = playerInfoForwarding;
+    this.playerInfoForwardingMode = playerInfoForwardingMode;
     this.forwardingSecret = forwardingSecret;
     this.onlineModeKickExistingPlayers = onlineModeKickExistingPlayers;
     this.pingPassthrough = pingPassthrough;
@@ -132,158 +128,12 @@ public class VelocityConfiguration implements ProxyConfig {
     this.query = query;
     this.metrics = metrics;
     this.forceKeyAuthentication = forceKeyAuthentication;
-    this.security = security;
-    this.antiddos = antiddos;
-    this.antibot = antibot;
-    this.packetFilter = packetFilter;
-  }
-
-  public static class Security {
-    @Expose private boolean advancedProtection = true;
-    @Expose private int minKeySize = 2048;
-    @Expose private List<String> allowedCiphers = Arrays.asList(
-        "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
-        "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
-    );
-    @Expose private Map<String, List<String>> accessControl = new HashMap<>();
-
-    public Security() {}
-
-    public Security(CommentedConfig config) {
-      if (config != null) {
-        this.advancedProtection = config.getOrElse("advanced-protection", true);
-        this.minKeySize = config.getIntOrElse("min-key-size", 2048);
-        this.allowedCiphers = config.getOrElse("allowed-ciphers", this.allowedCiphers);
-        this.accessControl = parseAccessControl(config.get("access-control"));
-      }
-    }
-
-    private Map<String, List<String>> parseAccessControl(UnmodifiableConfig config) {
-        if (config == null) return new HashMap<>();
-        
-        Map<String, List<String>> result = new HashMap<>();
-        for (UnmodifiableConfig.Entry entry : config.entrySet()) {
-            if (entry.getValue() instanceof List) {
-                result.put(entry.getKey(), (List<String>) entry.getValue());
-            }
-        }
-        return result;
-    }
-
-    public boolean isAdvancedProtection() { return advancedProtection; }
-    public int getMinKeySize() { return minKeySize; }
-    public List<String> getAllowedCiphers() { return allowedCiphers; }
-    public Map<String, List<String>> getAccessControl() { return accessControl; }
-  }
-
-  public static class AntiDDoS {
-    @Expose private boolean enabled = true;
-    @Expose private int maxConnections = 1000;
-    @Expose private int connectionThreshold = 100;
-    @Expose private int blacklistDuration = 3600;
-    @Expose private Map<String, Integer> thresholds = new HashMap<>();
-
-    public AntiDDoS() {}
-
-    public AntiDDoS(CommentedConfig config) {
-      if (config != null) {
-        this.enabled = config.getOrElse("enabled", true);
-        this.maxConnections = config.getIntOrElse("max-connections", 1000);
-        this.connectionThreshold = config.getIntOrElse("connection-threshold", 100);
-        this.blacklistDuration = config.getIntOrElse("blacklist-duration", 3600);
-        this.thresholds = parseThresholds(config.get("thresholds"));
-      }
-    }
-
-    private Map<String, Integer> parseThresholds(UnmodifiableConfig config) {
-        if (config == null) return new HashMap<>();
-        
-        Map<String, Integer> result = new HashMap<>();
-        for (UnmodifiableConfig.Entry entry : config.entrySet()) {
-            if (entry.getValue() instanceof Integer) {
-                result.put(entry.getKey(), (Integer) entry.getValue());
-            }
-        }
-        return result;
-    }
-
-    public boolean isEnabled() { return enabled; }
-    public int getMaxConnections() { return maxConnections; }
-    public int getConnectionThreshold() { return connectionThreshold; }
-    public int getBlacklistDuration() { return blacklistDuration; }
-    public Map<String, Integer> getThresholds() { return thresholds; }
-  }
-
-  public static class AntiBot {
-    @Expose private boolean enabled = true;
-    @Expose private String mode = "AUTO";
-    @Expose private int verificationTimeout = 30;
-    @Expose private Map<String, Object> checks = new HashMap<>();
-
-    public AntiBot() {}
-
-    public AntiBot(CommentedConfig config) {
-      if (config != null) {
-        this.enabled = config.getOrElse("enabled", true);
-        this.mode = config.getOrElse("mode", "AUTO");
-        this.verificationTimeout = config.getIntOrElse("verification-timeout", 30);
-        this.checks = parseChecks(config.get("checks"));
-      }
-    }
-
-    private Map<String, Object> parseChecks(UnmodifiableConfig config) {
-        if (config == null) return new HashMap<>();
-        
-        Map<String, Object> result = new HashMap<>();
-        for (UnmodifiableConfig.Entry entry : config.entrySet()) {
-            result.put(entry.getKey(), entry.getValue());
-        }
-        return result;
-    }
-
-    public boolean isEnabled() { return enabled; }
-    public String getMode() { return mode; }
-    public int getVerificationTimeout() { return verificationTimeout; }
-    public Map<String, Object> getChecks() { return checks; }
-  }
-
-  public static class PacketFilter {
-    @Expose private boolean enabled = true;
-    @Expose private int maxPacketSize = 2097152; // 2MB mặc định
-    @Expose private List<String> blockedPackets = new ArrayList<>();
-    @Expose private Map<String, Integer> rateLimits = new HashMap<>();
-
-    public PacketFilter() {}
-
-    public PacketFilter(CommentedConfig config) {
-      if (config != null) {
-        this.enabled = config.getOrElse("enabled", true);
-        this.maxPacketSize = config.getIntOrElse("max-packet-size", 2097152);
-        this.blockedPackets = config.getOrElse("blocked-packets", new ArrayList<>());
-        this.rateLimits = parseRateLimits(config.get("rate-limits"));
-      }
-    }
-
-    private Map<String, Integer> parseRateLimits(UnmodifiableConfig config) {
-        if (config == null) return new HashMap<>();
-        
-        Map<String, Integer> result = new HashMap<>();
-        for (UnmodifiableConfig.Entry entry : config.entrySet()) {
-            if (entry.getValue() instanceof Integer) {
-                result.put(entry.getKey(), (Integer) entry.getValue());
-            }
-        }
-        return result;
-    }
-
-    public boolean isEnabled() { return enabled; }
-    public int getMaxPacketSize() { return maxPacketSize; }
-    public List<String> getBlockedPackets() { return blockedPackets; }
-    public Map<String, Integer> getRateLimits() { return rateLimits; }
   }
 
   /**
    * Attempts to validate the configuration.
+   *
+   * @return {@code true} if the configuration is sound, {@code false} if not
    */
   public boolean validate() {
     boolean valid = true;
@@ -389,27 +239,8 @@ public class VelocityConfiguration implements ProxyConfig {
       valid = false;
     }
 
-    if (security.getMinKeySize() < 1024) {
-        logger.error("Min key size must be at least 1024 bits");
-        valid = false;
-    }
-
-    if (antiddos.getMaxConnections() < 1) {
-        logger.error("Max connections must be positive");
-        valid = false;
-    }
-
-    if (antibot.getVerificationTimeout() < 0) {
-        logger.error("Verification timeout cannot be negative");
-        valid = false;
-    }
-
-    if (packetFilter.getMaxPacketSize() < 0) {
-        logger.error("Max packet size cannot be negative"); 
-        valid = false;
-    }
-
     loadFavicon();
+
     return valid;
   }
 
@@ -426,11 +257,6 @@ public class VelocityConfiguration implements ProxyConfig {
 
   public InetSocketAddress getBind() {
     return AddressUtil.parseAndResolveAddress(bind);
-  }
-
-  @Override
-  public int getKickAfterRateLimitedTabCompletes() {
-      return advanced.getKickAfterRateLimitedTabCompletes();
   }
 
   @Override
@@ -545,6 +371,11 @@ public class VelocityConfiguration implements ProxyConfig {
   }
 
   @Override
+  public int getKickAfterRateLimitedTabCompletes() {
+    return advanced.getKickAfterRateLimitedTabCompletes();
+  }
+
+  @Override
   public boolean isForwardCommandsIfRateLimited() {
     return advanced.isForwardCommandsIfRateLimited();
   }
@@ -614,44 +445,8 @@ public class VelocityConfiguration implements ProxyConfig {
     return forceKeyAuthentication;
   }
 
-  public Security getSecurity() {
-    return security;
-  }
-
-  public AntiDDoS getAntiDDoS() {
-    return antiddos; 
-  }
-
-  public AntiBot getAntiBot() {
-    return antibot;
-  }
-
-  public PacketFilter getPacketFilter() {
-    return packetFilter;
-  }
-
   public boolean isEnableReusePort() {
     return advanced.isEnableReusePort();
-  }
-
-  public boolean isOnlineModeKickExistingPlayers() {
-    return onlineModeKickExistingPlayers;
-  }
-
-  public boolean isApiEnabled() {
-    return true; // Default implementation
-  }
-
-  public boolean isMonitoringEnabled() {
-    return true; // Default implementation
-  }
-
-  public void load() {
-    // Implementation for loading config
-  }
-
-  public void save() {
-    // Implementation for saving config
   }
 
   @Override
@@ -676,6 +471,10 @@ public class VelocityConfiguration implements ProxyConfig {
 
   /**
    * Reads the Velocity configuration from {@code path}.
+   *
+   * @param path the path to read from
+   * @return the deserialized Velocity configuration
+   * @throws IOException if we could not read from the {@code path}.
    */
   @SuppressFBWarnings(value = "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
       justification = "I looked carefully and there's no way SpotBugs is right.")
@@ -700,16 +499,6 @@ public class VelocityConfiguration implements ProxyConfig {
             .build()
     ) {
       config.load();
-
-      // Timezone
-      String timestamp = LocalDateTime.now(ZoneOffset.UTC)
-          .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-      String user = System.getProperty("user.name");
-      
-      config.setComment("", String.format(
-          "Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): %s\n" +
-          "Current User's Login: %s", 
-          timestamp, user));
 
       final ConfigurationMigration[] migrations = {
           new ForwardingMigration(),
@@ -751,11 +540,6 @@ public class VelocityConfiguration implements ProxyConfig {
       final CommentedConfig advancedConfig = config.get("advanced");
       final CommentedConfig queryConfig = config.get("query");
       final CommentedConfig metricsConfig = config.get("metrics");
-      final CommentedConfig securityConfig = config.get("security");
-      final CommentedConfig antiddosConfig = config.get("antiddos");
-      final CommentedConfig antibotConfig = config.get("antibot");
-      final CommentedConfig packetFilterConfig = config.get("packet-filter");
-
       final PlayerInfoForwarding forwardingMode = config.getEnumOrElse(
               "player-info-forwarding-mode", PlayerInfoForwarding.NONE);
       final PingPassthroughMode pingPassthroughMode = config.getEnumOrElse("ping-passthrough",
@@ -783,34 +567,33 @@ public class VelocityConfiguration implements ProxyConfig {
       }
 
       return new VelocityConfiguration(
-          bind,
-          motd,
-          maxPlayers,
-          onlineMode,
-          preventClientProxyConnections,
-          announceForge,
-          forwardingMode,
-          forwardingSecret,
-          kickExisting,
-          pingPassthroughMode,
-          samplePlayersInPing,
-          enablePlayerAddressLogging,
-          new Servers(serversConfig),
-          new ForcedHosts(forcedHostsConfig),
-          new Advanced(advancedConfig),
-          new Query(queryConfig),
-          new Metrics(metricsConfig),
-          forceKeyAuthentication,
-          new Security(securityConfig),      
-          new AntiDDoS(antiddosConfig),      
-          new AntiBot(antibotConfig),
-          new PacketFilter(packetFilterConfig)
+              bind,
+              motd,
+              maxPlayers,
+              onlineMode,
+              preventClientProxyConnections,
+              announceForge,
+              forwardingMode,
+              forwardingSecret,
+              kickExisting,
+              pingPassthroughMode,
+              samplePlayersInPing,
+              enablePlayerAddressLogging,
+              new Servers(serversConfig),
+              new ForcedHosts(forcedHostsConfig),
+              new Advanced(advancedConfig),
+              new Query(queryConfig),
+              new Metrics(metricsConfig),
+              forceKeyAuthentication
       );
     }
   }
 
   /**
    * Generates a Random String.
+   *
+   * @param length the required string size.
+   * @return a new random string.
    */
   public static String generateRandomString(int length) {
     final String chars = "AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890";
@@ -1185,7 +968,7 @@ public class VelocityConfiguration implements ProxyConfig {
           + ", showPlugins=" + showPlugins
           + '}';
     }
-  
+  }
 
   /**
    * Configuration for metrics.
@@ -1205,6 +988,3 @@ public class VelocityConfiguration implements ProxyConfig {
     }
   }
 }
-}
-
-   

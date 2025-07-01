@@ -1,55 +1,23 @@
-name: Java CI with Gradle
+# This workflow will build a Java project with Gradle
+# For more information see: https://docs.github.com/actions/language-and-framework-guides/building-and-testing-java-with-gradle
 
-on:
-  push:
-    branches: [ "main", "dev/3.0.0" ]
-  pull_request:
-    branches: [ "main", "dev/3.0.0" ]
+name: Java CI with Gradle
+on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    
+    runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v4
-    
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@v4
     - name: Set up JDK 21
       uses: actions/setup-java@v4
       with:
-        java-version: '21'
-        distribution: 'temurin'
-    
-    - name: Setup Gradle
-      uses: gradle/gradle-build-action@v3
-    
-    - name: Update Build Time
-      run: |
-        echo "/*
-         * Current Date and Time (UTC): $(date -u +%Y-%m-%d\ %H:%M:%S)
-         * Current User's Login: ${{ github.actor }}
-         */
-        
-        package com.velocitypowered.proxy;
-        
-        public final class BuildConstants {
-            public static final String VERSION = \"3.0.0\";
-            public static final String BUILD_TIME = \"$(date -u +%Y-%m-%d\ %H:%M:%S)\";
-            public static final String USER = \"${{ github.actor }}\";
-            
-            private BuildConstants() {}
-        }" > proxy/src/main/java/com/velocitypowered/proxy/BuildConstants.java
-
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-      
+        java-version: 21
+        distribution: 'zulu'
     - name: Build with Gradle
-      run: ./gradlew clean build
-
-    - name: Upload Build Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: SentinelProxy-${{ github.sha }}
-        path: |
-          proxy/build/libs/*.jar
-          LICENSE
-          README.md
+      run: ./gradlew build

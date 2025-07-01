@@ -18,8 +18,6 @@
 package com.velocitypowered.proxy;
 
 import com.google.common.base.MoreObjects;
-import java.net.InetSocketAddress;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.gson.Gson;
@@ -70,16 +68,6 @@ import com.velocitypowered.proxy.util.ResourceUtils;
 import com.velocitypowered.proxy.util.VelocityChannelRegistrar;
 import com.velocitypowered.proxy.util.ratelimit.Ratelimiter;
 import com.velocitypowered.proxy.util.ratelimit.Ratelimiters;
-import com.velocitypowered.proxy.security.*;
-import com.velocitypowered.proxy.security.SecurityManager;
-import com.velocitypowered.proxy.security.PacketFilterManager;
-import com.velocitypowered.proxy.protection.AdvancedAntiBotHandler;
-import com.velocitypowered.proxy.protection.AdvancedAntiDDoSManager;
-import com.velocitypowered.proxy.protection.PacketExploitChecker;
-import com.velocitypowered.proxy.protection.*;
-import com.velocitypowered.proxy.protection.anomaly.AnomalyDetector;
-import com.velocitypowered.proxy.security.rules.*;
-import com.velocitypowered.proxy.security.store.*;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -125,8 +113,6 @@ import org.checkerframework.checker.nullness.qual.EnsuresNonNull;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
-import java.time.Duration;
-import java.util.HashMap;
 
 /**
  * Implementation of {@link ProxyServer}.
@@ -136,7 +122,6 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
   public static final String VELOCITY_URL = "https://velocitypowered.com";
 
   private static final Logger logger = LogManager.getLogger(VelocityServer.class);
-  
   public static final Gson GENERAL_GSON = new GsonBuilder()
       .registerTypeHierarchyAdapter(Favicon.class, FaviconSerializer.INSTANCE)
       .registerTypeHierarchyAdapter(GameProfile.class, GameProfileSerializer.INSTANCE)
@@ -186,10 +171,7 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
   private final VelocityScheduler scheduler;
   private final VelocityChannelRegistrar channelRegistrar = new VelocityChannelRegistrar();
   private final ServerListPingHandler serverListPingHandler;
-  private final SecurityManager securityManager;
-  private final AdvancedAntiDDoSManager antiDDoSManager;
-  private final AdvancedAntiBotHandler antiBotManager;
-  private final PacketFilterManager packetFilterManager;
+
   VelocityServer(final ProxyOptions options) {
     pluginManager = new VelocityPluginManager(this);
     eventManager = new VelocityEventManager(pluginManager);
@@ -200,26 +182,8 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     servers = new ServerMap(this);
     serverListPingHandler = new ServerListPingHandler(this);
     this.options = options;
-    this.securityManager = new SecurityManager(this);
-    this.antiDDoSManager = new AdvancedAntiDDoSManager(this);
-    this.antiBotManager = new AdvancedAntiBotHandler(this);
-    this.packetFilterManager = new PacketFilterManager(this); 
   }
-public SecurityManager getSecurityManager() {
-    return securityManager;
-}
 
-public AdvancedAntiDDoSManager getAntiDDoSManager() {
-      return antiDDoSManager;
-    }
-    
-public AdvancedAntiBotHandler getAntiBotManager() {
-      return antiBotManager;
-    }
-
-public PacketFilterManager getPacketFilterManager() {
-    return packetFilterManager;
-}
   public KeyPair getServerKeyPair() {
     return serverKeyPair;
   }
@@ -236,13 +200,13 @@ public PacketFilterManager getPacketFilterManager() {
     String implVersion;
     String implVendor;
     if (pkg != null) {
-      implName = MoreObjects.firstNonNull(pkg.getImplementationTitle(), "SentinelProxy");
+      implName = MoreObjects.firstNonNull(pkg.getImplementationTitle(), "Velocity");
       implVersion = MoreObjects.firstNonNull(pkg.getImplementationVersion(), "<unknown>");
-      implVendor = MoreObjects.firstNonNull(pkg.getImplementationVendor(), "khoasoma, akk1to dev");
+      implVendor = MoreObjects.firstNonNull(pkg.getImplementationVendor(), "Velocity Contributors");
     } else {
-      implName = "SentinelProxy";
+      implName = "Velocity";
       implVersion = "<unknown>";
-      implVendor = "khoasoma, akk1to dev";
+      implVendor = "Velocity Contributors";
     }
 
     return new ProxyVersion(implName, implVendor, implVersion);
@@ -273,11 +237,6 @@ public PacketFilterManager getPacketFilterManager() {
     logger.info("Booting up {} {}...", getVersion().getName(), getVersion().getVersion());
     console.setupStreams();
     pluginManager.registerPlugin(this.createVirtualPlugin());
-    securityManager.start();
-    antiBotManager.start();
-    antiDDoSManager.start();
-    packetFilterManager.start();
-
 
     registerTranslations();
 
@@ -522,10 +481,6 @@ public PacketFilterManager getPacketFilterManager() {
     if (!newConfiguration.validate()) {
       return false;
     }
-    securityManager.reload();
-    antiDDoSManager.reload();
-    antiBotManager.reload();
-    packetFilterManager.reload();
 
     // Re-register servers. If a server is being replaced, make sure to note what players need to
     // move back to a fallback server.
@@ -618,10 +573,7 @@ public PacketFilterManager getPacketFilterManager() {
 
     Runnable shutdownProcess = () -> {
       logger.info("Shutting down the proxy...");
-        securityManager.shutdown();
-        antiDDoSManager.shutdown();
-        antiBotManager.shutdown();
-        packetFilterManager.shutdown();
+
       // Shutdown the connection manager, this should be
       // done first to refuse new connections
       cm.shutdown();
@@ -727,12 +679,6 @@ public PacketFilterManager getPacketFilterManager() {
    * @return {@code true} if we can register the connection, {@code false} if not
    */
   public boolean canRegisterConnection(ConnectedPlayer connection) {
-    if (!antiBotManager.canRegisterConnection(connection)) {
-        return false;
-    }
-    if (!antiDDoSManager.canRegisterConnection(connection)) {
-        return false;
-    }
     if (configuration.isOnlineMode() && configuration.isOnlineModeKickExistingPlayers()) {
       return true;
     }

@@ -1,9 +1,11 @@
 import com.github.jengelman.gradle.plugins.shadow.transformers.Log4j2PluginsCacheFileTransformer
+import io.papermc.fill.model.BuildChannel
 
 plugins {
     application
     id("velocity-init-manifest")
     alias(libs.plugins.shadow)
+    alias(libs.plugins.fill)
 }
 
 application {
@@ -18,7 +20,7 @@ tasks {
 
     jar {
         manifest {
-            attributes["Implementation-Title"] = "Project v11 Velocity Fork"
+            attributes["Implementation-Title"] = "Velocity"
             attributes["Implementation-Vendor"] = "Velocity Contributors"
             attributes["Multi-Release"] = "true"
         }
@@ -108,6 +110,24 @@ tasks {
     }
 }
 
+val projectVersion = version as String
+fill {
+    project("velocity")
+
+    build {
+        channel = BuildChannel.STABLE
+        versionFamily("3.0.0")
+        version(projectVersion)
+
+        downloads {
+            register("server:default") {
+                file = tasks.shadowJar.flatMap { it.archiveFile }
+                nameResolver.set { project, _, version, build -> "$project-$version-$build.jar" }
+            }
+        }
+    }
+}
+
 dependencies {
     implementation(project(":velocity-api"))
     implementation(project(":velocity-native"))
@@ -148,9 +168,4 @@ dependencies {
     testImplementation(libs.mockito)
 
     annotationProcessor(libs.auto.service)
-    implementation("io.prometheus:simpleclient:0.16.0")
-    implementation("io.prometheus:simpleclient_hotspot:0.16.0")
-    implementation("com.squareup.okhttp3:okhttp:4.9.3")
-    implementation("com.google.guava:guava:31.1-jre")
-    implementation ("org.apache.logging.log4j:log4j-core:2.14.1")
 }

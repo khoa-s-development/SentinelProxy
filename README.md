@@ -1,4 +1,4 @@
-# Project Velocity11
+# Velocity
 
 [![Build Status](https://img.shields.io/github/actions/workflow/status/PaperMC/Velocity/gradle.yml)](https://papermc.io/downloads/velocity)
 [![Join our Discord](https://img.shields.io/discord/289587909051416579.svg?logo=discord&label=)](https://discord.gg/papermc)
@@ -33,4 +33,4 @@ Once you've built Velocity, you can copy and run the `-all` JAR from
 and you can configure it from there.
 
 Alternatively, you can get the proxy JAR from the [downloads](https://papermc.io/downloads/velocity)
-page...
+page.
