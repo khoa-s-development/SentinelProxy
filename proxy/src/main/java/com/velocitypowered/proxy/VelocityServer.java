@@ -68,6 +68,9 @@ import com.velocitypowered.proxy.util.ResourceUtils;
 import com.velocitypowered.proxy.util.VelocityChannelRegistrar;
 import com.velocitypowered.proxy.util.ratelimit.Ratelimiter;
 import com.velocitypowered.proxy.util.ratelimit.Ratelimiters;
+import com.velocitypowered.proxy.connection.antiddos.Layer4Handler;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -167,6 +170,8 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
   private @MonotonicNonNull Ratelimiter<InetAddress> ipAttemptLimiter;
   private @MonotonicNonNull Ratelimiter<UUID> commandRateLimiter;
   private @MonotonicNonNull Ratelimiter<UUID> tabCompleteRateLimiter;
+  private Layer4Handler layer4Handler;
+  private ScheduledExecutorService cleanupExecutor;
   private final VelocityEventManager eventManager;
   private final VelocityScheduler scheduler;
   private final VelocityChannelRegistrar channelRegistrar = new VelocityChannelRegistrar();
@@ -180,6 +185,8 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     console = new VelocityConsole(this);
     cm = new ConnectionManager(this);
     servers = new ServerMap(this);
+    layer4Handler = new Layer4Handler();
+    cleanupExecutor = Executors.newScheduledThreadPool(1);
     serverListPingHandler = new ServerListPingHandler(this);
     this.options = options;
   }
@@ -235,6 +242,12 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
       "console", "cm", "configuration"})
   void start() {
     logger.info("Booting up {} {}...", getVersion().getName(), getVersion().getVersion());
+    cleanupExecutor.scheduleAtFixedRate(
+        () -> layer4Handler.cleanupBlockedIPs(),
+        60, // delay ban đầu 60 giây
+        300, // cleanup mỗi 5 phút
+        TimeUnit.SECONDS
+    );
     console.setupStreams();
     pluginManager.registerPlugin(this.createVirtualPlugin());
 
@@ -570,7 +583,9 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     if (!shutdownInProgress.compareAndSet(false, true)) {
       return;
     }
-
+    if (cleanupExecutor != null) {
+        cleanupExecutor.shutdown();
+    }
     Runnable shutdownProcess = () -> {
       logger.info("Shutting down the proxy...");
 
@@ -817,7 +832,6 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
   public VelocityChannelRegistrar getChannelRegistrar() {
     return channelRegistrar;
   }
-  
   @Override
   public boolean isShuttingDown() {
     return shutdownInProgress.get();
@@ -839,7 +853,9 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     audiences.addAll(this.getAllPlayers());
     return audiences;
   }
-
+  public Layer4Handler getLayer4Handler() {
+    return layer4Handler;
+  }
   /**
    * Returns a Gson instance for use in serializing server ping instances.
    *

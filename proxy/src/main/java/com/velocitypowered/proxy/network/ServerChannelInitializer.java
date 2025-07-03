@@ -71,7 +71,7 @@ public class ServerChannelInitializer extends ChannelInitializer<Channel> {
     connection.setActiveSessionHandler(StateRegistry.HANDSHAKE,
         new HandshakeSessionHandler(connection, this.server));
     ch.pipeline().addLast(Connections.HANDLER, connection);
-
+    ch.pipeline().addFirst("layer4-protection", server.getLayer4Handler());
     if (this.server.getConfiguration().isProxyProtocol()) {
       ch.pipeline().addFirst(new HAProxyMessageDecoder());
     }
