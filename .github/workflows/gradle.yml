@@ -1,64 +1,23 @@
-name: SentinelProxy - ver/0.2
+# This workflow will build a Java project with Gradle
+# For more information see: https://docs.github.com/actions/language-and-framework-guides/building-and-testing-java-with-gradle
 
-on:
-  push:
-    branches: [ "dev/3.0.0" ]
-  pull_request:
-    branches: [ "dev/3.0.0" ]
-
-permissions: write-all
+name: Java CI with Gradle
+on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    environment: default
+    runs-on: ubuntu-22.04
     steps:
-      - name: Checkout Git Repository
-        uses: actions/checkout@v4
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: zulu
-          java-version: 21
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Build
-        run: ./gradlew Build
-
-      - name: Publish to repo
-        if: github.event_name != 'pull_request'
-        continue-on-error: true
-        run: ./gradlew generateDevelopmentBundle publish -PpublishDevBundle=true
-        env:
-          PRIVATE_MAVEN_REPO_PASSWORD: ${{ secrets.PRIVATE_MAVEN_REPO_PASSWORD }}
-          PRIVATE_MAVEN_REPO_USERNAME: ${{ secrets.PRIVATE_MAVEN_REPO_USERNAME }}
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.project_id_b }} CI Artifacts
-          path: luminol-server/build/libs/*-paperclip-*-mojmap.jar
-
-      - name: SetENV
-        if: github.event_name != 'pull_request'
-        run: sh scripts/SetENV.sh
-
-      - name: Create Release
-        if: github.event_name != 'pull_request'
-        uses: ncipollo/release-action@v1
-        with:
-          tag: ${{ env.tag }}
-          name: ${{ env.project_id_b }} ${{ env.mcversion }} - ${{ env.commit_id }}
-          body: |
-            📦Version: `${{ env.mcversion }}` | Commit ${{ env.commit_id }} [![download](https://img.shields.io/github/downloads/LuminolMC/${{ env.project_id }}/${{ env.tag }}/total?color=red&style=flat-square)](https://github.com/LuminolMC/${{ env.project_id }}/releases/download/${{ env.tag }}/${{ env.jar }})
-            This release is automatically compiled by GitHub Actions
-            ### Commit Message
-            ${{ env.commit_msg }}
-          artifacts: ${{ env.jar_dir }}
-          generateReleaseNotes: true
-          prerelease: ${{ env.pre }}
-          makeLatest: ${{ env.make_latest }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@v4
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: 21
+        distribution: 'zulu'
+    - name: Build with Gradle
+      run: ./gradlew build
