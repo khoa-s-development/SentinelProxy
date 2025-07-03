@@ -1,3 +1,0 @@
--cp
-proxy/build/libs/*:proxy/src/main/java
-./proxy/src/main/java/com/velocitypowered/proxy/connection/antiddos/Layer4Handler.java
