@@ -1,9 +1,10 @@
 import com.diffplug.gradle.spotless.SpotlessExtension
-import com.diffplug.gradle.spotless.SpotlessPlugin
 
-apply<SpotlessPlugin>()
+plugins {
+    id("com.diffplug.spotless")
+}
 
-extensions.configure<SpotlessExtension> {
+spotless {
     java {
         if (project.name == "velocity-api") {
             licenseHeaderFile(file("HEADER.txt"))

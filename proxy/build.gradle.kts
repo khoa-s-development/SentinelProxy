@@ -14,14 +14,10 @@ application {
 }
 
 tasks {
-    withType<Checkstyle> {
-        exclude("**/com/velocitypowered/proxy/protocol/packet/**")
-    }
-
     jar {
         manifest {
-            attributes["Implementation-Title"] = "Velocity"
-            attributes["Implementation-Vendor"] = "Velocity Contributors"
+            attributes["Implementation-Title"] = "SentinalsProxy"
+            attributes["Implementation-Vendor"] = "Sentinals Contributors"
             attributes["Multi-Release"] = "true"
         }
     }
@@ -129,9 +125,9 @@ fill {
 }
 
 dependencies {
-    implementation(project(":velocity-api"))
-    implementation(project(":velocity-native"))
-    implementation(project(":velocity-proxy-log4j2-plugin"))
+    implementation(project(":sentinals-api"))
+    implementation(project(":sentinals-native"))
+    implementation(project(":sentinals-proxy-log4j2-plugin"))
 
     implementation(libs.bundles.log4j)
     implementation(libs.kyori.ansi)

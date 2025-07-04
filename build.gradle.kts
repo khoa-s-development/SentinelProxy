@@ -1,13 +1,11 @@
 plugins {
     `java-library`
-    id("velocity-checkstyle") apply false
     id("velocity-spotless") apply false
 }
 
 subprojects {
     apply<JavaLibraryPlugin>()
 
-    apply(plugin = "velocity-checkstyle")
     apply(plugin = "velocity-spotless")
 
     java {

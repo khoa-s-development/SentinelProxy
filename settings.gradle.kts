@@ -20,14 +20,14 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "0.9.0"
 }
 
-rootProject.name = "velocity"
+rootProject.name = "sentinalsProxy"
 
 sequenceOf(
     "api",
     "native",
     "proxy",
 ).forEach {
-    val project = ":velocity-$it"
+    val project = ":sentinals-$it"
     include(project)
     project(project).projectDir = file(it)
 }
@@ -38,6 +38,6 @@ include(deprecatedConfigurateModule)
 project(deprecatedConfigurateModule).projectDir = file("proxy/deprecated/configurate3")
 
 // Log4J2 plugin
-val log4j2ProxyPlugin = ":velocity-proxy-log4j2-plugin"
+val log4j2ProxyPlugin = ":sentinals-proxy-log4j2-plugin"
 include(log4j2ProxyPlugin)
 project(log4j2ProxyPlugin).projectDir = file("proxy/log4j2-plugin")

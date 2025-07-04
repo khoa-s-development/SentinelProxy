@@ -59,6 +59,7 @@ import com.velocitypowered.proxy.plugin.loader.VelocityPluginDescription;
 import com.velocitypowered.proxy.plugin.virtual.VelocityVirtualPlugin;
 import com.velocitypowered.proxy.protocol.ProtocolUtils;
 import com.velocitypowered.proxy.protocol.util.FaviconSerializer;
+import com.velocitypowered.proxy.connection.antiddos.Layer4Handler;
 import com.velocitypowered.proxy.protocol.util.GameProfileSerializer;
 import com.velocitypowered.proxy.scheduler.VelocityScheduler;
 import com.velocitypowered.proxy.server.ServerMap;
@@ -68,9 +69,6 @@ import com.velocitypowered.proxy.util.ResourceUtils;
 import com.velocitypowered.proxy.util.VelocityChannelRegistrar;
 import com.velocitypowered.proxy.util.ratelimit.Ratelimiter;
 import com.velocitypowered.proxy.util.ratelimit.Ratelimiters;
-import com.velocitypowered.proxy.connection.antiddos.Layer4Handler;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -97,6 +95,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -122,7 +122,7 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  */
 public class VelocityServer implements ProxyServer, ForwardingAudience {
 
-  public static final String VELOCITY_URL = "https://velocitypowered.com";
+  public static final String VELOCITY_URL = "https://sentinalsproxy.com";
 
   private static final Logger logger = LogManager.getLogger(VelocityServer.class);
   public static final Gson GENERAL_GSON = new GsonBuilder()
@@ -207,13 +207,13 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     String implVersion;
     String implVendor;
     if (pkg != null) {
-      implName = MoreObjects.firstNonNull(pkg.getImplementationTitle(), "Velocity");
+      implName = MoreObjects.firstNonNull(pkg.getImplementationTitle(), "SentinalsProxy");
       implVersion = MoreObjects.firstNonNull(pkg.getImplementationVersion(), "<unknown>");
-      implVendor = MoreObjects.firstNonNull(pkg.getImplementationVendor(), "Velocity Contributors");
+      implVendor = MoreObjects.firstNonNull(pkg.getImplementationVendor(), "Sentinals Contributors");
     } else {
-      implName = "Velocity";
+      implName = "SentinalsProxy";
       implVersion = "<unknown>";
-      implVendor = "Velocity Contributors";
+      implVendor = "Sentinals Contributors";
     }
 
     return new ProxyVersion(implName, implVendor, implVersion);
@@ -222,7 +222,7 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
   private VelocityPluginContainer createVirtualPlugin() {
     ProxyVersion version = getVersion();
     PluginDescription description = new VelocityPluginDescription(
-        "velocity", version.getName(), version.getVersion(), "The Velocity proxy",
+        "sentinalsproxy", version.getName(), version.getVersion(), "The SentinalsProxy",
         VELOCITY_URL, ImmutableList.of(version.getVendor()), Collections.emptyList(), null);
     VelocityPluginContainer container = new VelocityPluginContainer(description);
     container.setInstance(VelocityVirtualPlugin.INSTANCE);
@@ -243,7 +243,7 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
   void start() {
     logger.info("Booting up {} {}...", getVersion().getName(), getVersion().getVersion());
     cleanupExecutor.scheduleAtFixedRate(
-        () -> layer4Handler.cleanupBlockedIPs(),
+        () -> layer4Handler.cleanupBlockedIps(),
         60, // delay ban đầu 60 giây
         300, // cleanup mỗi 5 phút
         TimeUnit.SECONDS
@@ -584,7 +584,7 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
       return;
     }
     if (cleanupExecutor != null) {
-        cleanupExecutor.shutdown();
+      cleanupExecutor.shutdown();
     }
     Runnable shutdownProcess = () -> {
       logger.info("Shutting down the proxy...");
@@ -832,6 +832,7 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
   public VelocityChannelRegistrar getChannelRegistrar() {
     return channelRegistrar;
   }
+
   @Override
   public boolean isShuttingDown() {
     return shutdownInProgress.get();
@@ -853,9 +854,11 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     audiences.addAll(this.getAllPlayers());
     return audiences;
   }
+
   public Layer4Handler getLayer4Handler() {
     return layer4Handler;
   }
+
   /**
    * Returns a Gson instance for use in serializing server ping instances.
    *
