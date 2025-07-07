@@ -18,7 +18,6 @@
 package com.velocitypowered.proxy.connection.antiddos;
 
 import com.velocitypowered.proxy.protocol.MinecraftPacket;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import java.net.InetAddress;
@@ -33,7 +32,6 @@ import org.slf4j.LoggerFactory;
  * Layer 4 DDoS Protection Handler.
  * Xử lý bảo vệ chống tấn công DDoS ở tầng TCP/UDP
  */
-@ChannelHandler.Sharable
 public class Layer4Handler extends ChannelInboundHandlerAdapter {
 
   private static final Logger logger = LoggerFactory.getLogger(Layer4Handler.class);
@@ -529,126 +527,6 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
     } catch (Exception e) {
       logger.debug("[Layer4Handler] Error analyzing Minecraft packet: {}", e.getMessage());
     }
-  }
-
-  /**
-   * Performs advanced client analysis for bot detection in lobby verification
-   * This method combines multiple metrics to assess client legitimacy
-   * 
-   * @param clientIp The IP address to analyze
-   * @param username The username to analyze
-   * @param behaviorFlags Additional behavior flags (comma-separated)
-   * @return A risk score from 0.0 (legitimate) to 1.0 (highly suspicious)
-   */
-  public double performAdvancedClientAnalysis(InetAddress clientIp, String username, String behaviorFlags) {
-    logger.info("[Layer4Handler] [ADVANCED-ANALYSIS] Starting comprehensive client analysis for {}", clientIp.getHostAddress());
-    
-    double riskScore = 0.0;
-    StringBuilder analysis = new StringBuilder();
-    analysis.append("[Layer4Handler] [ADVANCED-ANALYSIS] Risk Assessment:\n");
-    
-    // 1. Connection pattern analysis
-    AtomicInteger connections = connectionCount.get(clientIp);
-    if (connections != null && connections.get() > 1) {
-      double connectionRisk = Math.min(1.0, connections.get() / (double) config.maxConnectionsPerIp);
-      riskScore += connectionRisk * 0.3;
-      analysis.append("  ├─ Connection Risk: ").append(String.format("%.2f", connectionRisk))
-          .append(" (").append(connections.get()).append(" connections)\n");
-    }
-    
-    // 2. Packet behavior analysis
-    PacketRateTracker tracker = packetRates.get(clientIp);
-    if (tracker != null) {
-      double packetRisk = Math.min(1.0, tracker.packetCount.get() / (double) config.maxPacketsPerSecond);
-      riskScore += packetRisk * 0.25;
-      analysis.append("  ├─ Packet Risk: ").append(String.format("%.2f", packetRisk))
-          .append(" (").append(tracker.packetCount.get()).append(" packets)\n");
-      
-      if (tracker.errorCount.get() > 0) {
-        double errorRisk = Math.min(1.0, tracker.errorCount.get() / 10.0);
-        riskScore += errorRisk * 0.2;
-        analysis.append("  ├─ Error Risk: ").append(String.format("%.2f", errorRisk))
-            .append(" (").append(tracker.errorCount.get()).append(" errors)\n");
-      }
-    }
-    
-    // 3. Username pattern analysis
-    if (username != null) {
-      double usernameRisk = analyzeUsernamePattern(username);
-      riskScore += usernameRisk * 0.15;
-      analysis.append("  ├─ Username Risk: ").append(String.format("%.2f", usernameRisk))
-          .append(" (pattern analysis)\n");
-    }
-    
-    // 4. Behavior flags analysis
-    if (behaviorFlags != null && !behaviorFlags.trim().isEmpty()) {
-      String[] flags = behaviorFlags.split(",");
-      double behaviorRisk = Math.min(1.0, flags.length / 5.0);
-      riskScore += behaviorRisk * 0.1;
-      analysis.append("  ├─ Behavior Risk: ").append(String.format("%.2f", behaviorRisk))
-          .append(" (").append(flags.length).append(" flags)\n");
-    }
-    
-    // 5. Historical analysis (if previously blocked)
-    if (blockedIps.containsKey(clientIp)) {
-      riskScore += 0.4; // High penalty for previously blocked IPs
-      analysis.append("  ├─ History Risk: 0.40 (previously blocked)\n");
-    }
-    
-    // Ensure risk score doesn't exceed 1.0
-    riskScore = Math.min(1.0, riskScore);
-    
-    analysis.append("  └─ TOTAL RISK SCORE: ").append(String.format("%.3f", riskScore));
-    
-    if (riskScore > 0.7) {
-      analysis.append(" [HIGH RISK - POTENTIAL BOT]");
-      logger.error(analysis.toString());
-    } else if (riskScore > 0.4) {
-      analysis.append(" [MEDIUM RISK - MONITOR CLOSELY]");
-      logger.warn(analysis.toString());
-    } else {
-      analysis.append(" [LOW RISK - LIKELY LEGITIMATE]");
-      logger.info(analysis.toString());
-    }
-    
-    return riskScore;
-  }
-
-  /**
-   * Analyzes username patterns for bot detection
-   * 
-   * @param username The username to analyze
-   * @return Risk score from 0.0 to 1.0
-   */
-  private double analyzeUsernamePattern(String username) {
-    if (username == null || username.trim().isEmpty()) {
-      return 0.8; // High risk for empty usernames
-    }
-    
-    double risk = 0.0;
-    
-    // Check for common bot patterns
-    if (username.matches(".*\\d{4,}.*")) {
-      risk += 0.3; // Many consecutive numbers
-    }
-    
-    if (username.matches("^[a-zA-Z]+\\d+$")) {
-      risk += 0.2; // Letters followed by numbers only
-    }
-    
-    if (username.length() < 3 || username.length() > 16) {
-      risk += 0.3; // Unusual length
-    }
-    
-    if (username.matches(".*[xX]{2,}.*") || username.matches(".*[zZ]{2,}.*")) {
-      risk += 0.2; // Repeated x's or z's (common in bots)
-    }
-    
-    if (username.toLowerCase().contains("bot") || username.toLowerCase().contains("test")) {
-      risk += 0.5; // Contains bot-related terms
-    }
-    
-    return Math.min(1.0, risk);
   }
 
   private static class PacketRateTracker {

@@ -99,7 +99,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -199,8 +198,8 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     cm = new ConnectionManager(this);
     servers = new ServerMap(this);
     
-    // Create handler instances with configuration from velocity.toml
-    AntiDdosConfig layer4Config = loadLayer4Config();
+    // Create handler instances with default configurations
+    AntiDdosConfig layer4Config = new AntiDdosConfig();
     layer4Handler = new Layer4Handler(layer4Config);
     layer7Handler = new Layer7Handler(this);
     
@@ -1031,12 +1030,15 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
    */
   private AntiBotConfig loadAntiBotConfig() {
     try {
-      // Load from the main velocity.toml configuration under [antibot] section
-      if (configuration != null) {
-        logger.info("Loading AntiBot configuration from velocity.toml [antibot] section...");
+      // Try to load from antibot.toml file
+      Path configPath = Path.of("antibot.toml");
+      if (Files.exists(configPath)) {
+        logger.info("Loading AntiBot configuration from antibot.toml...");
+        // TODO: Implement TOML loading when SecurityConfigParser is ready
+        // For now, use default with some customization based on velocity.toml
         return createAntiBotConfigFromVelocityConfig();
       } else {
-        logger.info("No configuration available, creating default AntiBot configuration...");
+        logger.info("No antibot.toml found, creating default configuration...");
         return createDefaultAntiBotConfig();
       }
     } catch (Exception e) {
@@ -1051,73 +1053,33 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
    * @return configured AntiBot instance
    */
   private AntiBotConfig createAntiBotConfigFromVelocityConfig() {
-    try {
-      // Access the [antibot] section from velocity.toml
-      // Note: This assumes VelocityConfiguration has been extended to include antibot settings
-      // For now, we'll create a robust default configuration that can be easily customized
-      
-      boolean enabled = getBooleanFromConfig("antibot.enabled", true);
-      boolean kickEnabled = getBooleanFromConfig("antibot.kick-enabled", false);
-      boolean checkOnlyFirstJoin = getBooleanFromConfig("antibot.check-only-first-join", true);
-      
-      boolean gravityCheckEnabled = getBooleanFromConfig("antibot.gravity-check-enabled", false);
-      boolean hitboxCheckEnabled = getBooleanFromConfig("antibot.hitbox-check-enabled", false);
-      boolean yawCheckEnabled = getBooleanFromConfig("antibot.yaw-check-enabled", false);
-      boolean clientBrandCheckEnabled = getBooleanFromConfig("antibot.client-brand-check-enabled", false);
-      boolean miniWorldCheckEnabled = getBooleanFromConfig("antibot.mini-world-check-enabled", true);
-      boolean connectionRateLimitEnabled = getBooleanFromConfig("antibot.connection-rate-limit-enabled", true);
-      boolean usernamePatternCheckEnabled = getBooleanFromConfig("antibot.username-pattern-check-enabled", true);
-      boolean dnsCheckEnabled = getBooleanFromConfig("antibot.dns-check-enabled", false);
-      boolean latencyCheckEnabled = getBooleanFromConfig("antibot.latency-check-enabled", false);
-      
-      int kickThreshold = getIntFromConfig("antibot.kick-threshold", 5);
-      String kickMessage = getStringFromConfig("antibot.kick-message", 
-          "You have been kicked for suspicious behavior. Please try again.");
-      
-      int miniWorldDuration = getIntFromConfig("antibot.mini-world-duration", 10);
-      int miniWorldMinMovements = getIntFromConfig("antibot.mini-world-min-movements", 3);
-      double miniWorldMinDistance = getDoubleFromConfig("antibot.mini-world-min-distance", 2.0);
-      
-      int connectionRateLimit = getIntFromConfig("antibot.connection-rate-limit", 3);
-      int connectionRateWindowMs = getIntFromConfig("antibot.connection-rate-window-ms", 5000);
-      int throttleDurationMs = getIntFromConfig("antibot.throttle-duration-ms", 15000);
-      
-      int minLatencyMs = getIntFromConfig("antibot.min-latency-ms", 50);
-      int maxLatencyMs = getIntFromConfig("antibot.max-latency-ms", 500);
-      
-      List<String> allowedBrandsList = getStringListFromConfig("antibot.allowed-brands", 
-          List.of("vanilla", "fabric", "forge", "quilt", "optifine"));
-      Set<String> allowedBrands = new java.util.HashSet<>(allowedBrandsList);
-      
-      return AntiBotConfig.builder()
-          .enabled(enabled)
-          .kickEnabled(kickEnabled)
-          .checkOnlyFirstJoin(checkOnlyFirstJoin)
-          .gravityCheckEnabled(gravityCheckEnabled)
-          .hitboxCheckEnabled(hitboxCheckEnabled)
-          .yawCheckEnabled(yawCheckEnabled)
-          .clientBrandCheckEnabled(clientBrandCheckEnabled)
-          .miniWorldCheckEnabled(miniWorldCheckEnabled)
-          .connectionRateLimitEnabled(connectionRateLimitEnabled)
-          .usernamePatternCheckEnabled(usernamePatternCheckEnabled)
-          .dnsCheckEnabled(dnsCheckEnabled)
-          .latencyCheckEnabled(latencyCheckEnabled)
-          .kickThreshold(kickThreshold)
-          .kickMessage(kickMessage)
-          .miniWorldDuration(miniWorldDuration)
-          .miniWorldMinMovements(miniWorldMinMovements)
-          .miniWorldMinDistance(miniWorldMinDistance)
-          .connectionRateLimit(connectionRateLimit)
-          .connectionRateWindowMs(connectionRateWindowMs)
-          .throttleDurationMs(throttleDurationMs)
-          .minLatencyThreshold(minLatencyMs)
-          .maxLatencyThreshold(maxLatencyMs)
-          .allowedBrands(allowedBrands)
-          .build();
-    } catch (Exception e) {
-      logger.warn("Error parsing AntiBot configuration from velocity.toml, using enhanced defaults: {}", e.getMessage());
-      return createEnhancedDefaultConfig();
-    }
+    // Extract relevant settings from velocity configuration if available
+    // For now, create enhanced defaults
+    return AntiBotConfig.builder()
+        .enabled(true)
+        .kickEnabled(true)
+        .checkOnlyFirstJoin(true)
+        .gravityCheckEnabled(true)
+        .hitboxCheckEnabled(true)
+        .yawCheckEnabled(true)
+        .clientBrandCheckEnabled(true)
+        .miniWorldCheckEnabled(true)
+        .connectionRateLimitEnabled(true)
+        .usernamePatternCheckEnabled(true)
+        .dnsCheckEnabled(true)
+        .latencyCheckEnabled(true)
+        .kickThreshold(3)
+        .kickMessage("You have been kicked for suspicious behavior. Please try again.")
+        .miniWorldDuration(15)
+        .miniWorldMinMovements(5)
+        .miniWorldMinDistance(3.0)
+        .connectionRateLimit(5)
+        .connectionRateWindowMs(10000)
+        .throttleDurationMs(30000)
+        .minLatencyMs(50)
+        .maxLatencyMs(500)
+        .allowedBrands(List.of("vanilla", "fabric", "forge", "quilt"))
+        .build();
   }
 
   /**
@@ -1147,97 +1109,7 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
         .connectionRateLimit(3)
         .connectionRateWindowMs(5000)
         .throttleDurationMs(15000)
-        .minLatencyThreshold(50)
-        .maxLatencyThreshold(500)
-        .allowedBrands(new java.util.HashSet<>(java.util.List.of("vanilla", "fabric", "forge", "quilt", "optifine")))
         .build();
-  }
-
-  /**
-   * Create enhanced default configuration with better protection.
-   * 
-   * @return enhanced default AntiBot configuration
-   */
-  private AntiBotConfig createEnhancedDefaultConfig() {
-    return AntiBotConfig.builder()
-        .enabled(true)
-        .kickEnabled(false) // Start with logging only
-        .checkOnlyFirstJoin(true)
-        .gravityCheckEnabled(false)
-        .hitboxCheckEnabled(false)
-        .yawCheckEnabled(false)
-        .clientBrandCheckEnabled(true) // Enable brand checking
-        .miniWorldCheckEnabled(true)
-        .connectionRateLimitEnabled(true)
-        .usernamePatternCheckEnabled(true)
-        .dnsCheckEnabled(false)
-        .latencyCheckEnabled(false)
-        .kickThreshold(3) // Lower threshold for enhanced protection
-        .kickMessage("You have been kicked for suspicious behavior. Please try again.")
-        .miniWorldDuration(15) // Longer verification time
-        .miniWorldMinMovements(5) // More movements required
-        .miniWorldMinDistance(3.0) // Greater distance required
-        .connectionRateLimit(2) // Stricter rate limiting
-        .connectionRateWindowMs(10000) // Longer window
-        .throttleDurationMs(30000) // Longer throttle
-        .minLatencyThreshold(30)
-        .maxLatencyThreshold(800)
-        .allowedBrands(new java.util.HashSet<>(java.util.List.of("vanilla", "fabric", "forge", "quilt", "optifine")))
-        .build();
-  }
-
-  // Helper methods for configuration parsing
-  // These would ideally integrate with the actual TOML parsing system
-  
-  private boolean getBooleanFromConfig(String key, boolean defaultValue) {
-    try {
-      // TODO: Implement actual TOML parsing when configuration system is extended
-      // For now, return default values
-      return defaultValue;
-    } catch (Exception e) {
-      logger.debug("Could not parse boolean config key '{}', using default: {}", key, defaultValue);
-      return defaultValue;
-    }
-  }
-
-  private int getIntFromConfig(String key, int defaultValue) {
-    try {
-      // TODO: Implement actual TOML parsing when configuration system is extended
-      return defaultValue;
-    } catch (Exception e) {
-      logger.debug("Could not parse int config key '{}', using default: {}", key, defaultValue);
-      return defaultValue;
-    }
-  }
-
-  private double getDoubleFromConfig(String key, double defaultValue) {
-    try {
-      // TODO: Implement actual TOML parsing when configuration system is extended
-      return defaultValue;
-    } catch (Exception e) {
-      logger.debug("Could not parse double config key '{}', using default: {}", key, defaultValue);
-      return defaultValue;
-    }
-  }
-
-  private String getStringFromConfig(String key, String defaultValue) {
-    try {
-      // TODO: Implement actual TOML parsing when configuration system is extended
-      return defaultValue;
-    } catch (Exception e) {
-      logger.debug("Could not parse string config key '{}', using default: {}", key, defaultValue);
-      return defaultValue;
-    }
-  }
-
-  private List<String> getStringListFromConfig(String key, List<String> defaultValue) {
-    try {
-      // TODO: Implement actual TOML parsing when configuration system is extended
-      return defaultValue;
-    } catch (Exception e) {
-      logger.debug("Could not parse string list config key '{}', using default: {}", key, defaultValue);
-      return defaultValue;
-    }
   }
 
   /**
@@ -1256,73 +1128,5 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     } catch (Exception e) {
       logger.error("Failed to integrate AntiBot with Layer4Handler", e);
     }
-  }
-
-  /**
-   * Load Layer4 DDoS protection configuration from velocity.toml
-   * 
-   * @return configured AntiDdosConfig instance
-   */
-  private AntiDdosConfig loadLayer4Config() {
-    try {
-      if (configuration != null) {
-        logger.info("Loading Layer4 protection configuration from velocity.toml [layer4-protection] section...");
-        return createLayer4ConfigFromVelocityConfig();
-      } else {
-        logger.info("No configuration available, creating default Layer4 configuration...");
-        return createDefaultLayer4Config();
-      }
-    } catch (Exception e) {
-      logger.warn("Error loading Layer4 configuration, using defaults: {}", e.getMessage());
-      return createDefaultLayer4Config();
-    }
-  }
-
-  /**
-   * Create Layer4 configuration based on main Velocity configuration.
-   * 
-   * @return configured AntiDdosConfig instance
-   */
-  private AntiDdosConfig createLayer4ConfigFromVelocityConfig() {
-    try {
-      boolean enabled = getBooleanFromConfig("layer4-protection.enabled", true);
-      int maxConnectionsPerIp = getIntFromConfig("layer4-protection.max-connections-per-ip", 3);
-      int maxPacketsPerSecond = getIntFromConfig("layer4-protection.max-packets-per-second", 100);
-      int rateLimitWindowMs = getIntFromConfig("layer4-protection.rate-limit-window-ms", 1000);
-      int blockDurationMs = getIntFromConfig("layer4-protection.block-duration-ms", 300000);
-      boolean advancedLoggingEnabled = getBooleanFromConfig("layer4-protection.advanced-logging-enabled", true);
-
-      AntiDdosConfig config = new AntiDdosConfig();
-      config.maxConnectionsPerIp = maxConnectionsPerIp;
-      config.maxPacketsPerSecond = maxPacketsPerSecond;
-      config.rateLimitWindowMs = rateLimitWindowMs;
-      config.blockDurationMs = blockDurationMs;
-      
-      logger.info("Layer4 configuration loaded: maxConnections={}, maxPackets={}, blockDuration={}ms",
-          maxConnectionsPerIp, maxPacketsPerSecond, blockDurationMs);
-      
-      return config;
-    } catch (Exception e) {
-      logger.warn("Error parsing Layer4 configuration from velocity.toml, using defaults: {}", e.getMessage());
-      return createDefaultLayer4Config();
-    }
-  }
-
-  /**
-   * Create default Layer4 configuration.
-   * 
-   * @return default AntiDdosConfig
-   */
-  private AntiDdosConfig createDefaultLayer4Config() {
-    AntiDdosConfig config = new AntiDdosConfig();
-    config.maxConnectionsPerIp = 3;
-    config.maxPacketsPerSecond = 100;
-    config.rateLimitWindowMs = 1000;
-    config.blockDurationMs = 300000; // 5 minutes
-    
-    logger.info("Using default Layer4 configuration: maxConnections={}, maxPackets={}, blockDuration={}ms",
-        config.maxConnectionsPerIp, config.maxPacketsPerSecond, config.blockDurationMs);
-    
-    return config;
   }
 }

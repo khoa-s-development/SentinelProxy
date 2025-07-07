@@ -18,7 +18,6 @@
 package com.velocitypowered.proxy.connection.antiddos;
 
 import com.velocitypowered.proxy.protocol.MinecraftPacket;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import java.net.InetAddress;
@@ -33,7 +32,6 @@ import org.slf4j.LoggerFactory;
  * Layer 4 DDoS Protection Handler.
  * Xử lý bảo vệ chống tấn công DDoS ở tầng TCP/UDP
  */
-@ChannelHandler.Sharable
 public class Layer4Handler extends ChannelInboundHandlerAdapter {
 
   private static final Logger logger = LoggerFactory.getLogger(Layer4Handler.class);
@@ -95,7 +93,7 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
         clientIp, connections.get());
     
     // Advanced client analysis
-    performAdvancedClientAnalysis(clientIp, "unknown", "");
+    performAdvancedClientAnalysis(ctx, clientIp);
     
     super.channelActive(ctx);
   }
@@ -121,7 +119,7 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
     logger.trace("[Layer4Handler] Reading packet from IP: {}", clientIp);
 
     // Advanced lobby check - Monitor packet patterns
-    logPacketAnalysisBasic(clientIp, msg);
+    logPacketAnalysis(clientIp, msg);
 
     // Kiểm tra rate limiting
     if (!checkRateLimit(clientIp)) {
@@ -145,7 +143,7 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
       }
       
       // Advanced packet behavior analysis
-      analyzeMinecraftPacketBehavior(clientIp, (MinecraftPacket) msg);
+      analyzePacketBehavior(clientIp, (MinecraftPacket) msg);
     }
 
     super.channelRead(ctx, msg);
@@ -358,297 +356,139 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
   }
 
   /**
-   * Advanced lobby check logging - logs detailed client join analysis
-   * This method provides comprehensive debugging for bot detection in verification worlds
+   * Perform advanced client analysis for lobby security.
    * 
-   * @param clientIp The IP address of the joining client
-   * @param username The username of the joining client
-   * @param serverName The name of the server/world being joined
-   * @param connectionTime How long the client has been connected (ms)
+   * @param ctx the channel context
+   * @param clientIp the client IP address
    */
-  public void logClientJoinAdvanced(InetAddress clientIp, String username, String serverName, long connectionTime) {
-    logger.info("[Layer4Handler] [LOBBY-CHECK] Client join analysis:");
-    logger.info("  ├─ IP: {}", clientIp.getHostAddress());
-    logger.info("  ├─ Username: {}", username);
-    logger.info("  ├─ Target Server: {}", serverName);
-    logger.info("  ├─ Connection Duration: {}ms", connectionTime);
-    
-    // Analyze current connection statistics for this IP
-    AtomicInteger connections = connectionCount.get(clientIp);
-    PacketRateTracker tracker = packetRates.get(clientIp);
-    
-    if (connections != null) {
-      logger.info("  ├─ Active Connections: {}/{}", connections.get(), config.maxConnectionsPerIp);
-      
-      if (connections.get() > 1) {
-        logger.warn("  ├─ [SUSPICIOUS] Multiple connections from same IP detected");
-      }
-    }
-    
-    if (tracker != null) {
+  private void performAdvancedClientAnalysis(ChannelHandlerContext ctx, InetAddress clientIp) {
+    try {
+      // Analyze connection timing patterns
       long currentTime = System.currentTimeMillis();
-      long windowAge = currentTime - tracker.lastReset.get();
-      logger.info("  ├─ Packet Activity: {}/{} packets (window: {}ms)", 
-          tracker.packetCount.get(), config.maxPacketsPerSecond, windowAge);
-      logger.info("  ├─ Error Count: {}", tracker.errorCount.get());
+      PacketRateTracker tracker = packetRates.get(clientIp);
       
-      // Analyze packet behavior patterns
-      if (tracker.packetCount.get() > config.maxPacketsPerSecond * 0.8) {
-        logger.warn("  ├─ [SUSPICIOUS] High packet rate detected ({}% of limit)", 
-            (tracker.packetCount.get() * 100) / config.maxPacketsPerSecond);
+      if (tracker != null) {
+        long timeSinceLastConnection = currentTime - tracker.lastReset.get();
+        logger.debug("[LOBBY-CHECK] Time since last activity from {}: {} ms", clientIp, timeSinceLastConnection);
+        
+        // Detect rapid reconnection patterns (potential bot behavior)
+        if (timeSinceLastConnection < 1000) { // Less than 1 second
+          logger.warn("[LOBBY-CHECK] Rapid reconnection detected from IP {} ({}ms gap)", 
+              clientIp, timeSinceLastConnection);
+        }
       }
       
-      if (tracker.errorCount.get() > 5) {
-        logger.warn("  ├─ [SUSPICIOUS] High error count detected");
-      }
-    }
-    
-    // Check if this is a blocked IP trying to connect
-    if (isBlocked(clientIp)) {
-      logger.error("  └─ [CRITICAL] Blocked IP attempting lobby join - connection should be rejected");
-    } else {
-      logger.info("  └─ [OK] Client appears legitimate for lobby verification");
-    }
-  }
-
-  /**
-   * Logs detailed packet analysis for lobby check debugging
-   * 
-   * @param clientIp The IP address of the client
-   * @param packetType The type/name of the packet
-   * @param packetSize The size of the packet in bytes
-   * @param isInbound Whether this is an inbound (true) or outbound (false) packet
-   */
-  public void logPacketAnalysis(InetAddress clientIp, String packetType, int packetSize, boolean isInbound) {
-    PacketRateTracker tracker = packetRates.get(clientIp);
-    String direction = isInbound ? "INBOUND" : "OUTBOUND";
-    
-    logger.debug("[Layer4Handler] [PACKET-ANALYSIS] {} packet from {}: type={}, size={}b", 
-        direction, clientIp.getHostAddress(), packetType, packetSize);
-    
-    if (tracker != null) {
-      // Log detailed packet statistics
-      logger.trace("[Layer4Handler] [PACKET-ANALYSIS] Client {} packet stats: count={}, errors={}, window_age={}ms", 
-          clientIp.getHostAddress(), 
-          tracker.packetCount.get(), 
-          tracker.errorCount.get(),
-          System.currentTimeMillis() - tracker.lastReset.get());
-      
-      // Detect suspicious packet patterns
-      if (packetSize > 1024 && packetType.contains("Custom")) {
-        logger.warn("[Layer4Handler] [PACKET-ANALYSIS] [SUSPICIOUS] Large custom packet detected: {}b from {}", 
-            packetSize, clientIp.getHostAddress());
+      // Check for geographic patterns (basic implementation)
+      String hostAddress = clientIp.getHostAddress();
+      if (isPrivateOrLocalAddress(clientIp)) {
+        logger.debug("[LOBBY-CHECK] Local/private network connection from {}", hostAddress);
+      } else {
+        logger.debug("[LOBBY-CHECK] External connection from {}", hostAddress);
       }
       
-      if (tracker.packetCount.get() > 0 && tracker.packetCount.get() % 100 == 0) {
-        logger.info("[Layer4Handler] [PACKET-ANALYSIS] High activity client {}: {} packets processed", 
-            clientIp.getHostAddress(), tracker.packetCount.get());
-      }
+      // Initialize tracking for this client
+      PacketRateTracker newTracker = packetRates.computeIfAbsent(clientIp, k -> new PacketRateTracker());
+      newTracker.lastReset.set(currentTime);
+      
+      logger.info("[LOBBY-CHECK] Advanced analysis completed for IP {}", clientIp);
+      
+    } catch (Exception e) {
+      logger.error("[LOBBY-CHECK] Error in advanced client analysis for {}: {}", clientIp, e.getMessage());
     }
   }
 
   /**
-   * Basic packet analysis logging for channelRead method
+   * Log packet analysis for lobby behavior monitoring.
    * 
-   * @param clientIp The IP address of the client
-   * @param msg The packet/message object
+   * @param clientIp the client IP address
+   * @param msg the packet message
    */
-  private void logPacketAnalysisBasic(InetAddress clientIp, Object msg) {
+  private void logPacketAnalysis(InetAddress clientIp, Object msg) {
     try {
-      String packetType = msg.getClass().getSimpleName();
-      int estimatedSize = packetType.length() * 2; // Rough estimate
-      
-      logger.trace("[Layer4Handler] [PACKET-ANALYSIS] Processing packet from {}: type={}, estimated_size={}b", 
-          clientIp.getHostAddress(), packetType, estimatedSize);
-      
       PacketRateTracker tracker = packetRates.get(clientIp);
       if (tracker != null) {
-        // Log detailed packet statistics every 50 packets to avoid spam
-        if (tracker.packetCount.get() % 50 == 0) {
-          logger.debug("[Layer4Handler] [PACKET-ANALYSIS] Client {} activity: {} packets, {} errors", 
-              clientIp.getHostAddress(), tracker.packetCount.get(), tracker.errorCount.get());
+        int currentPacketCount = tracker.packetCount.get();
+        
+        // Log significant packet milestones
+        if (currentPacketCount == 1) {
+          logger.info("[LOBBY-CHECK] First packet received from IP {}", clientIp);
+        } else if (currentPacketCount % 100 == 0) {
+          long sessionDuration = System.currentTimeMillis() - tracker.lastReset.get();
+          logger.debug("[LOBBY-CHECK] IP {} sent {} packets in {}ms (avg: {}ms/packet)", 
+              clientIp, currentPacketCount, sessionDuration, 
+              sessionDuration / Math.max(1, currentPacketCount));
         }
         
-        // Detect suspicious packet patterns
-        if (packetType.contains("Custom") || packetType.contains("Unknown")) {
-          logger.warn("[Layer4Handler] [PACKET-ANALYSIS] [SUSPICIOUS] Unusual packet type: {} from {}", 
-              packetType, clientIp.getHostAddress());
+        // Detect packet flood patterns
+        if (currentPacketCount > config.maxPacketsPerSecond * 0.8) {
+          logger.warn("[LOBBY-CHECK] IP {} approaching packet rate limit ({}/{})", 
+              clientIp, currentPacketCount, config.maxPacketsPerSecond);
         }
       }
+      
+      // Analyze packet types
+      if (msg instanceof MinecraftPacket) {
+        MinecraftPacket mcPacket = (MinecraftPacket) msg;
+        logger.trace("[LOBBY-CHECK] Minecraft packet type: {} from IP {}", 
+            mcPacket.getClass().getSimpleName(), clientIp);
+      }
+      
     } catch (Exception e) {
-      logger.debug("[Layer4Handler] Error in packet analysis: {}", e.getMessage());
+      logger.warn("[LOBBY-CHECK] Error analyzing packet from {}: {}", clientIp, e.getMessage());
     }
   }
 
   /**
-   * Analyzes Minecraft packet behavior for bot detection
+   * Analyze packet behavior patterns for advanced bot detection.
    * 
-   * @param clientIp The IP address of the client
-   * @param packet The Minecraft packet to analyze
+   * @param clientIp the client IP address
+   * @param packet the Minecraft packet
    */
-  private void analyzeMinecraftPacketBehavior(InetAddress clientIp, MinecraftPacket packet) {
+  private void analyzePacketBehavior(InetAddress clientIp, MinecraftPacket packet) {
     try {
+      PacketRateTracker tracker = packetRates.get(clientIp);
+      if (tracker == null) return;
+      
+      long currentTime = System.currentTimeMillis();
+      long timeSinceLastReset = currentTime - tracker.lastReset.get();
+      int packetCount = tracker.packetCount.get();
+      
+      // Detect consistent timing patterns (bot-like behavior)
+      if (packetCount >= 10 && timeSinceLastReset > 0) {
+        double avgPacketInterval = (double) timeSinceLastReset / packetCount;
+        
+        // Very consistent intervals might indicate automated behavior
+        if (avgPacketInterval > 0 && avgPacketInterval < 50) { // Less than 50ms average
+          logger.warn("[LOBBY-CHECK] Suspicious packet timing from IP {}: {}ms avg interval", 
+              clientIp, String.format("%.2f", avgPacketInterval));
+        }
+      }
+      
+      // Log specific packet types of interest
       String packetType = packet.getClass().getSimpleName();
-      
-      logger.trace("[Layer4Handler] [MC-PACKET-ANALYSIS] Analyzing {} from {}", 
-          packetType, clientIp.getHostAddress());
-      
-      PacketRateTracker tracker = packetRates.get(clientIp);
-      if (tracker != null) {
-        // Check for rapid-fire packets (potential bot behavior)
-        long timeSinceReset = System.currentTimeMillis() - tracker.lastReset.get();
-        if (timeSinceReset < 1000 && tracker.packetCount.get() > 20) {
-          logger.warn("[Layer4Handler] [MC-PACKET-ANALYSIS] [SUSPICIOUS] Rapid packet burst from {}: {} packets in {}ms", 
-              clientIp.getHostAddress(), tracker.packetCount.get(), timeSinceReset);
-        }
-        
-        // Analyze specific packet patterns
-        if (packetType.contains("PlayerInput") || packetType.contains("Movement")) {
-          logger.trace("[Layer4Handler] [MC-PACKET-ANALYSIS] Movement packet from {}: {}", 
-              clientIp.getHostAddress(), packetType);
-          
-          // Detect unnatural movement patterns
-          if (tracker.packetCount.get() > 100 && tracker.packetCount.get() % 10 == 0) {
-            logger.debug("[Layer4Handler] [MC-PACKET-ANALYSIS] High movement activity from {}: {} packets", 
-                clientIp.getHostAddress(), tracker.packetCount.get());
-          }
-        }
-        
-        // Check for chat/command packets
-        if (packetType.contains("Chat") || packetType.contains("Command")) {
-          logger.info("[Layer4Handler] [MC-PACKET-ANALYSIS] Communication packet from {}: {}", 
-              clientIp.getHostAddress(), packetType);
-        }
-        
-        // Check for interaction packets (important for lobby verification)
-        if (packetType.contains("Interact") || packetType.contains("Use") || packetType.contains("Place")) {
-          logger.info("[Layer4Handler] [MC-PACKET-ANALYSIS] [LOBBY-INTERACTION] Interaction packet from {}: {}", 
-              clientIp.getHostAddress(), packetType);
-        }
+      if (packetType.contains("Handshake") || packetType.contains("Login") || packetType.contains("Status")) {
+        logger.info("[LOBBY-CHECK] Important packet received from {}: {}", clientIp, packetType);
       }
+      
+      // Detect potential protocol anomalies
+      if (packetCount == 1 && !packetType.contains("Handshake")) {
+        logger.warn("[LOBBY-CHECK] IP {} sent non-handshake packet as first packet: {}", 
+            clientIp, packetType);
+      }
+      
     } catch (Exception e) {
-      logger.debug("[Layer4Handler] Error analyzing Minecraft packet: {}", e.getMessage());
+      logger.warn("[LOBBY-CHECK] Error analyzing packet behavior from {}: {}", clientIp, e.getMessage());
     }
   }
 
   /**
-   * Performs advanced client analysis for bot detection in lobby verification
-   * This method combines multiple metrics to assess client legitimacy
+   * Check if an IP address is private or local.
    * 
-   * @param clientIp The IP address to analyze
-   * @param username The username to analyze
-   * @param behaviorFlags Additional behavior flags (comma-separated)
-   * @return A risk score from 0.0 (legitimate) to 1.0 (highly suspicious)
+   * @param ip the IP address to check
+   * @return true if the address is private/local
    */
-  public double performAdvancedClientAnalysis(InetAddress clientIp, String username, String behaviorFlags) {
-    logger.info("[Layer4Handler] [ADVANCED-ANALYSIS] Starting comprehensive client analysis for {}", clientIp.getHostAddress());
-    
-    double riskScore = 0.0;
-    StringBuilder analysis = new StringBuilder();
-    analysis.append("[Layer4Handler] [ADVANCED-ANALYSIS] Risk Assessment:\n");
-    
-    // 1. Connection pattern analysis
-    AtomicInteger connections = connectionCount.get(clientIp);
-    if (connections != null && connections.get() > 1) {
-      double connectionRisk = Math.min(1.0, connections.get() / (double) config.maxConnectionsPerIp);
-      riskScore += connectionRisk * 0.3;
-      analysis.append("  ├─ Connection Risk: ").append(String.format("%.2f", connectionRisk))
-          .append(" (").append(connections.get()).append(" connections)\n");
-    }
-    
-    // 2. Packet behavior analysis
-    PacketRateTracker tracker = packetRates.get(clientIp);
-    if (tracker != null) {
-      double packetRisk = Math.min(1.0, tracker.packetCount.get() / (double) config.maxPacketsPerSecond);
-      riskScore += packetRisk * 0.25;
-      analysis.append("  ├─ Packet Risk: ").append(String.format("%.2f", packetRisk))
-          .append(" (").append(tracker.packetCount.get()).append(" packets)\n");
-      
-      if (tracker.errorCount.get() > 0) {
-        double errorRisk = Math.min(1.0, tracker.errorCount.get() / 10.0);
-        riskScore += errorRisk * 0.2;
-        analysis.append("  ├─ Error Risk: ").append(String.format("%.2f", errorRisk))
-            .append(" (").append(tracker.errorCount.get()).append(" errors)\n");
-      }
-    }
-    
-    // 3. Username pattern analysis
-    if (username != null) {
-      double usernameRisk = analyzeUsernamePattern(username);
-      riskScore += usernameRisk * 0.15;
-      analysis.append("  ├─ Username Risk: ").append(String.format("%.2f", usernameRisk))
-          .append(" (pattern analysis)\n");
-    }
-    
-    // 4. Behavior flags analysis
-    if (behaviorFlags != null && !behaviorFlags.trim().isEmpty()) {
-      String[] flags = behaviorFlags.split(",");
-      double behaviorRisk = Math.min(1.0, flags.length / 5.0);
-      riskScore += behaviorRisk * 0.1;
-      analysis.append("  ├─ Behavior Risk: ").append(String.format("%.2f", behaviorRisk))
-          .append(" (").append(flags.length).append(" flags)\n");
-    }
-    
-    // 5. Historical analysis (if previously blocked)
-    if (blockedIps.containsKey(clientIp)) {
-      riskScore += 0.4; // High penalty for previously blocked IPs
-      analysis.append("  ├─ History Risk: 0.40 (previously blocked)\n");
-    }
-    
-    // Ensure risk score doesn't exceed 1.0
-    riskScore = Math.min(1.0, riskScore);
-    
-    analysis.append("  └─ TOTAL RISK SCORE: ").append(String.format("%.3f", riskScore));
-    
-    if (riskScore > 0.7) {
-      analysis.append(" [HIGH RISK - POTENTIAL BOT]");
-      logger.error(analysis.toString());
-    } else if (riskScore > 0.4) {
-      analysis.append(" [MEDIUM RISK - MONITOR CLOSELY]");
-      logger.warn(analysis.toString());
-    } else {
-      analysis.append(" [LOW RISK - LIKELY LEGITIMATE]");
-      logger.info(analysis.toString());
-    }
-    
-    return riskScore;
-  }
-
-  /**
-   * Analyzes username patterns for bot detection
-   * 
-   * @param username The username to analyze
-   * @return Risk score from 0.0 to 1.0
-   */
-  private double analyzeUsernamePattern(String username) {
-    if (username == null || username.trim().isEmpty()) {
-      return 0.8; // High risk for empty usernames
-    }
-    
-    double risk = 0.0;
-    
-    // Check for common bot patterns
-    if (username.matches(".*\\d{4,}.*")) {
-      risk += 0.3; // Many consecutive numbers
-    }
-    
-    if (username.matches("^[a-zA-Z]+\\d+$")) {
-      risk += 0.2; // Letters followed by numbers only
-    }
-    
-    if (username.length() < 3 || username.length() > 16) {
-      risk += 0.3; // Unusual length
-    }
-    
-    if (username.matches(".*[xX]{2,}.*") || username.matches(".*[zZ]{2,}.*")) {
-      risk += 0.2; // Repeated x's or z's (common in bots)
-    }
-    
-    if (username.toLowerCase().contains("bot") || username.toLowerCase().contains("test")) {
-      risk += 0.5; // Contains bot-related terms
-    }
-    
-    return Math.min(1.0, risk);
+  private boolean isPrivateOrLocalAddress(InetAddress ip) {
+    return ip.isLoopbackAddress() || ip.isLinkLocalAddress() || ip.isSiteLocalAddress();
   }
 
   private static class PacketRateTracker {

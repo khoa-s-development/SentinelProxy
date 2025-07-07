@@ -99,7 +99,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -199,8 +198,8 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     cm = new ConnectionManager(this);
     servers = new ServerMap(this);
     
-    // Create handler instances with configuration from velocity.toml
-    AntiDdosConfig layer4Config = loadLayer4Config();
+    // Create handler instances with default configurations
+    AntiDdosConfig layer4Config = new AntiDdosConfig();
     layer4Handler = new Layer4Handler(layer4Config);
     layer7Handler = new Layer7Handler(this);
     
@@ -1085,9 +1084,8 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
       int minLatencyMs = getIntFromConfig("antibot.min-latency-ms", 50);
       int maxLatencyMs = getIntFromConfig("antibot.max-latency-ms", 500);
       
-      List<String> allowedBrandsList = getStringListFromConfig("antibot.allowed-brands", 
+      List<String> allowedBrands = getStringListFromConfig("antibot.allowed-brands", 
           List.of("vanilla", "fabric", "forge", "quilt", "optifine"));
-      Set<String> allowedBrands = new java.util.HashSet<>(allowedBrandsList);
       
       return AntiBotConfig.builder()
           .enabled(enabled)
@@ -1110,8 +1108,8 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
           .connectionRateLimit(connectionRateLimit)
           .connectionRateWindowMs(connectionRateWindowMs)
           .throttleDurationMs(throttleDurationMs)
-          .minLatencyThreshold(minLatencyMs)
-          .maxLatencyThreshold(maxLatencyMs)
+          .minLatencyMs(minLatencyMs)
+          .maxLatencyMs(maxLatencyMs)
           .allowedBrands(allowedBrands)
           .build();
     } catch (Exception e) {
@@ -1147,9 +1145,9 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
         .connectionRateLimit(3)
         .connectionRateWindowMs(5000)
         .throttleDurationMs(15000)
-        .minLatencyThreshold(50)
-        .maxLatencyThreshold(500)
-        .allowedBrands(new java.util.HashSet<>(java.util.List.of("vanilla", "fabric", "forge", "quilt", "optifine")))
+        .minLatencyMs(50)
+        .maxLatencyMs(500)
+        .allowedBrands(List.of("vanilla", "fabric", "forge", "quilt", "optifine"))
         .build();
   }
 
@@ -1180,9 +1178,9 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
         .connectionRateLimit(2) // Stricter rate limiting
         .connectionRateWindowMs(10000) // Longer window
         .throttleDurationMs(30000) // Longer throttle
-        .minLatencyThreshold(30)
-        .maxLatencyThreshold(800)
-        .allowedBrands(new java.util.HashSet<>(java.util.List.of("vanilla", "fabric", "forge", "quilt", "optifine")))
+        .minLatencyMs(30)
+        .maxLatencyMs(800)
+        .allowedBrands(List.of("vanilla", "fabric", "forge", "quilt", "optifine"))
         .build();
   }
 
@@ -1256,73 +1254,5 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     } catch (Exception e) {
       logger.error("Failed to integrate AntiBot with Layer4Handler", e);
     }
-  }
-
-  /**
-   * Load Layer4 DDoS protection configuration from velocity.toml
-   * 
-   * @return configured AntiDdosConfig instance
-   */
-  private AntiDdosConfig loadLayer4Config() {
-    try {
-      if (configuration != null) {
-        logger.info("Loading Layer4 protection configuration from velocity.toml [layer4-protection] section...");
-        return createLayer4ConfigFromVelocityConfig();
-      } else {
-        logger.info("No configuration available, creating default Layer4 configuration...");
-        return createDefaultLayer4Config();
-      }
-    } catch (Exception e) {
-      logger.warn("Error loading Layer4 configuration, using defaults: {}", e.getMessage());
-      return createDefaultLayer4Config();
-    }
-  }
-
-  /**
-   * Create Layer4 configuration based on main Velocity configuration.
-   * 
-   * @return configured AntiDdosConfig instance
-   */
-  private AntiDdosConfig createLayer4ConfigFromVelocityConfig() {
-    try {
-      boolean enabled = getBooleanFromConfig("layer4-protection.enabled", true);
-      int maxConnectionsPerIp = getIntFromConfig("layer4-protection.max-connections-per-ip", 3);
-      int maxPacketsPerSecond = getIntFromConfig("layer4-protection.max-packets-per-second", 100);
-      int rateLimitWindowMs = getIntFromConfig("layer4-protection.rate-limit-window-ms", 1000);
-      int blockDurationMs = getIntFromConfig("layer4-protection.block-duration-ms", 300000);
-      boolean advancedLoggingEnabled = getBooleanFromConfig("layer4-protection.advanced-logging-enabled", true);
-
-      AntiDdosConfig config = new AntiDdosConfig();
-      config.maxConnectionsPerIp = maxConnectionsPerIp;
-      config.maxPacketsPerSecond = maxPacketsPerSecond;
-      config.rateLimitWindowMs = rateLimitWindowMs;
-      config.blockDurationMs = blockDurationMs;
-      
-      logger.info("Layer4 configuration loaded: maxConnections={}, maxPackets={}, blockDuration={}ms",
-          maxConnectionsPerIp, maxPacketsPerSecond, blockDurationMs);
-      
-      return config;
-    } catch (Exception e) {
-      logger.warn("Error parsing Layer4 configuration from velocity.toml, using defaults: {}", e.getMessage());
-      return createDefaultLayer4Config();
-    }
-  }
-
-  /**
-   * Create default Layer4 configuration.
-   * 
-   * @return default AntiDdosConfig
-   */
-  private AntiDdosConfig createDefaultLayer4Config() {
-    AntiDdosConfig config = new AntiDdosConfig();
-    config.maxConnectionsPerIp = 3;
-    config.maxPacketsPerSecond = 100;
-    config.rateLimitWindowMs = 1000;
-    config.blockDurationMs = 300000; // 5 minutes
-    
-    logger.info("Using default Layer4 configuration: maxConnections={}, maxPackets={}, blockDuration={}ms",
-        config.maxConnectionsPerIp, config.maxPacketsPerSecond, config.blockDurationMs);
-    
-    return config;
   }
 }

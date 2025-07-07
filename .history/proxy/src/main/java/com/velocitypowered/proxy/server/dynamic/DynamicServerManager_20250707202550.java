@@ -139,8 +139,7 @@ public class DynamicServerManager {
    * @return true if the server was removed, false if the server doesn't exist
    */
   public boolean removeServer(String name) {
-    Optional<RegisteredServer> serverOptional = serverMap.getServer(name);
-    if (!serverOptional.isPresent()) {
+    if (!serverMap.containsServer(name)) {
       logger.warn("Cannot remove server {}: server doesn't exist", name);
       return false;
     }
@@ -153,7 +152,7 @@ public class DynamicServerManager {
     }
     
     // Remove the server
-    serverMap.unregister(serverOptional.get().getServerInfo());
+    serverMap.unregister(name);
     dynamicServers.remove(name);
     serverHealthMap.remove(name);
     
@@ -221,7 +220,7 @@ public class DynamicServerManager {
    * @return true if the server exists, false otherwise
    */
   public boolean serverExists(String name) {
-    return serverMap.getServer(name).isPresent();
+    return serverMap.containsServer(name);
   }
   
   /**

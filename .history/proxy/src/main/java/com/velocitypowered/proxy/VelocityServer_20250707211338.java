@@ -99,7 +99,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -1085,9 +1084,8 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
       int minLatencyMs = getIntFromConfig("antibot.min-latency-ms", 50);
       int maxLatencyMs = getIntFromConfig("antibot.max-latency-ms", 500);
       
-      List<String> allowedBrandsList = getStringListFromConfig("antibot.allowed-brands", 
+      List<String> allowedBrands = getStringListFromConfig("antibot.allowed-brands", 
           List.of("vanilla", "fabric", "forge", "quilt", "optifine"));
-      Set<String> allowedBrands = new java.util.HashSet<>(allowedBrandsList);
       
       return AntiBotConfig.builder()
           .enabled(enabled)
@@ -1149,7 +1147,7 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
         .throttleDurationMs(15000)
         .minLatencyThreshold(50)
         .maxLatencyThreshold(500)
-        .allowedBrands(new java.util.HashSet<>(java.util.List.of("vanilla", "fabric", "forge", "quilt", "optifine")))
+        .allowedBrands(List.of("vanilla", "fabric", "forge", "quilt", "optifine"))
         .build();
   }
 
@@ -1180,9 +1178,9 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
         .connectionRateLimit(2) // Stricter rate limiting
         .connectionRateWindowMs(10000) // Longer window
         .throttleDurationMs(30000) // Longer throttle
-        .minLatencyThreshold(30)
-        .maxLatencyThreshold(800)
-        .allowedBrands(new java.util.HashSet<>(java.util.List.of("vanilla", "fabric", "forge", "quilt", "optifine")))
+        .minLatencyMs(30)
+        .maxLatencyMs(800)
+        .allowedBrands(List.of("vanilla", "fabric", "forge", "quilt", "optifine"))
         .build();
   }
 
@@ -1293,13 +1291,14 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
       boolean advancedLoggingEnabled = getBooleanFromConfig("layer4-protection.advanced-logging-enabled", true);
 
       AntiDdosConfig config = new AntiDdosConfig();
+      config.enabled = enabled;
       config.maxConnectionsPerIp = maxConnectionsPerIp;
       config.maxPacketsPerSecond = maxPacketsPerSecond;
       config.rateLimitWindowMs = rateLimitWindowMs;
       config.blockDurationMs = blockDurationMs;
       
-      logger.info("Layer4 configuration loaded: maxConnections={}, maxPackets={}, blockDuration={}ms",
-          maxConnectionsPerIp, maxPacketsPerSecond, blockDurationMs);
+      logger.info("Layer4 configuration loaded: enabled={}, maxConnections={}, maxPackets={}, blockDuration={}ms",
+          enabled, maxConnectionsPerIp, maxPacketsPerSecond, blockDurationMs);
       
       return config;
     } catch (Exception e) {
@@ -1315,6 +1314,7 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
    */
   private AntiDdosConfig createDefaultLayer4Config() {
     AntiDdosConfig config = new AntiDdosConfig();
+    config.enabled = true;
     config.maxConnectionsPerIp = 3;
     config.maxPacketsPerSecond = 100;
     config.rateLimitWindowMs = 1000;

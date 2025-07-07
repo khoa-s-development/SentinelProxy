@@ -18,7 +18,6 @@
 package com.velocitypowered.proxy.connection.antiddos;
 
 import com.velocitypowered.proxy.protocol.MinecraftPacket;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import java.net.InetAddress;
@@ -33,7 +32,6 @@ import org.slf4j.LoggerFactory;
  * Layer 4 DDoS Protection Handler.
  * Xử lý bảo vệ chống tấn công DDoS ở tầng TCP/UDP
  */
-@ChannelHandler.Sharable
 public class Layer4Handler extends ChannelInboundHandlerAdapter {
 
   private static final Logger logger = LoggerFactory.getLogger(Layer4Handler.class);

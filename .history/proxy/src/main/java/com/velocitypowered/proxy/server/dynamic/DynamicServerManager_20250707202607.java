@@ -221,7 +221,7 @@ public class DynamicServerManager {
    * @return true if the server exists, false otherwise
    */
   public boolean serverExists(String name) {
-    return serverMap.getServer(name).isPresent();
+    return serverMap.containsServer(name);
   }
   
   /**

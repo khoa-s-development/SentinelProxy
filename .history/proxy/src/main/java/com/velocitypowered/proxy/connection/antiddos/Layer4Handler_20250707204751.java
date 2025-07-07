@@ -18,7 +18,6 @@
 package com.velocitypowered.proxy.connection.antiddos;
 
 import com.velocitypowered.proxy.protocol.MinecraftPacket;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import java.net.InetAddress;
@@ -33,7 +32,6 @@ import org.slf4j.LoggerFactory;
  * Layer 4 DDoS Protection Handler.
  * Xử lý bảo vệ chống tấn công DDoS ở tầng TCP/UDP
  */
-@ChannelHandler.Sharable
 public class Layer4Handler extends ChannelInboundHandlerAdapter {
 
   private static final Logger logger = LoggerFactory.getLogger(Layer4Handler.class);
@@ -95,7 +93,7 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
         clientIp, connections.get());
     
     // Advanced client analysis
-    performAdvancedClientAnalysis(clientIp, "unknown", "");
+    performAdvancedClientAnalysis(ctx, clientIp);
     
     super.channelActive(ctx);
   }
@@ -121,7 +119,7 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
     logger.trace("[Layer4Handler] Reading packet from IP: {}", clientIp);
 
     // Advanced lobby check - Monitor packet patterns
-    logPacketAnalysisBasic(clientIp, msg);
+    logPacketAnalysis(clientIp, msg);
 
     // Kiểm tra rate limiting
     if (!checkRateLimit(clientIp)) {
@@ -145,7 +143,7 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
       }
       
       // Advanced packet behavior analysis
-      analyzeMinecraftPacketBehavior(clientIp, (MinecraftPacket) msg);
+      analyzePacketBehavior(clientIp, (MinecraftPacket) msg);
     }
 
     super.channelRead(ctx, msg);
@@ -444,90 +442,6 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
         logger.info("[Layer4Handler] [PACKET-ANALYSIS] High activity client {}: {} packets processed", 
             clientIp.getHostAddress(), tracker.packetCount.get());
       }
-    }
-  }
-
-  /**
-   * Basic packet analysis logging for channelRead method
-   * 
-   * @param clientIp The IP address of the client
-   * @param msg The packet/message object
-   */
-  private void logPacketAnalysisBasic(InetAddress clientIp, Object msg) {
-    try {
-      String packetType = msg.getClass().getSimpleName();
-      int estimatedSize = packetType.length() * 2; // Rough estimate
-      
-      logger.trace("[Layer4Handler] [PACKET-ANALYSIS] Processing packet from {}: type={}, estimated_size={}b", 
-          clientIp.getHostAddress(), packetType, estimatedSize);
-      
-      PacketRateTracker tracker = packetRates.get(clientIp);
-      if (tracker != null) {
-        // Log detailed packet statistics every 50 packets to avoid spam
-        if (tracker.packetCount.get() % 50 == 0) {
-          logger.debug("[Layer4Handler] [PACKET-ANALYSIS] Client {} activity: {} packets, {} errors", 
-              clientIp.getHostAddress(), tracker.packetCount.get(), tracker.errorCount.get());
-        }
-        
-        // Detect suspicious packet patterns
-        if (packetType.contains("Custom") || packetType.contains("Unknown")) {
-          logger.warn("[Layer4Handler] [PACKET-ANALYSIS] [SUSPICIOUS] Unusual packet type: {} from {}", 
-              packetType, clientIp.getHostAddress());
-        }
-      }
-    } catch (Exception e) {
-      logger.debug("[Layer4Handler] Error in packet analysis: {}", e.getMessage());
-    }
-  }
-
-  /**
-   * Analyzes Minecraft packet behavior for bot detection
-   * 
-   * @param clientIp The IP address of the client
-   * @param packet The Minecraft packet to analyze
-   */
-  private void analyzeMinecraftPacketBehavior(InetAddress clientIp, MinecraftPacket packet) {
-    try {
-      String packetType = packet.getClass().getSimpleName();
-      
-      logger.trace("[Layer4Handler] [MC-PACKET-ANALYSIS] Analyzing {} from {}", 
-          packetType, clientIp.getHostAddress());
-      
-      PacketRateTracker tracker = packetRates.get(clientIp);
-      if (tracker != null) {
-        // Check for rapid-fire packets (potential bot behavior)
-        long timeSinceReset = System.currentTimeMillis() - tracker.lastReset.get();
-        if (timeSinceReset < 1000 && tracker.packetCount.get() > 20) {
-          logger.warn("[Layer4Handler] [MC-PACKET-ANALYSIS] [SUSPICIOUS] Rapid packet burst from {}: {} packets in {}ms", 
-              clientIp.getHostAddress(), tracker.packetCount.get(), timeSinceReset);
-        }
-        
-        // Analyze specific packet patterns
-        if (packetType.contains("PlayerInput") || packetType.contains("Movement")) {
-          logger.trace("[Layer4Handler] [MC-PACKET-ANALYSIS] Movement packet from {}: {}", 
-              clientIp.getHostAddress(), packetType);
-          
-          // Detect unnatural movement patterns
-          if (tracker.packetCount.get() > 100 && tracker.packetCount.get() % 10 == 0) {
-            logger.debug("[Layer4Handler] [MC-PACKET-ANALYSIS] High movement activity from {}: {} packets", 
-                clientIp.getHostAddress(), tracker.packetCount.get());
-          }
-        }
-        
-        // Check for chat/command packets
-        if (packetType.contains("Chat") || packetType.contains("Command")) {
-          logger.info("[Layer4Handler] [MC-PACKET-ANALYSIS] Communication packet from {}: {}", 
-              clientIp.getHostAddress(), packetType);
-        }
-        
-        // Check for interaction packets (important for lobby verification)
-        if (packetType.contains("Interact") || packetType.contains("Use") || packetType.contains("Place")) {
-          logger.info("[Layer4Handler] [MC-PACKET-ANALYSIS] [LOBBY-INTERACTION] Interaction packet from {}: {}", 
-              clientIp.getHostAddress(), packetType);
-        }
-      }
-    } catch (Exception e) {
-      logger.debug("[Layer4Handler] Error analyzing Minecraft packet: {}", e.getMessage());
     }
   }
 
