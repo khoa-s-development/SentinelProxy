@@ -188,9 +188,6 @@ enabled = true
 # Whether to kick players who fail bot checks (true) or just log warnings (false)
 kick-enabled = false
 
-# Enable debug mode for verbose logging (WARNING: generates a lot of console output)
-debug-mode = false
-
 # Only check players on their first join to the network
 check-only-first-join = true
 
@@ -247,9 +244,6 @@ allowed-brands = ["vanilla", "fabric", "forge", "quilt", "optifine"]
 [layer4-protection]
 # Enable Layer 4 (TCP/UDP) DDoS protection
 enabled = true
-
-# Enable debug mode for verbose logging (WARNING: generates a lot of console output)
-debug-mode = false
 
 # Maximum connections allowed per IP address
 max-connections-per-ip = 3

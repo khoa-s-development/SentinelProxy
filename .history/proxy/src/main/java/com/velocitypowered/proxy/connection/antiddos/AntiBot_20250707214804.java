@@ -70,34 +70,6 @@ public class AntiBot {
   
   private static final Logger logger = LoggerFactory.getLogger(AntiBot.class);
   
-  /**
-   * Logs debug information only if debug mode is enabled.
-   * This helps reduce console spam when debug mode is disabled.
-   * 
-   * @param message the debug message
-   * @param args the arguments for the message
-   */
-  private void debugLog(String message, Object... args) {
-    if (config != null && config.isDebugMode()) {
-      logger.debug(message, args);
-    }
-  }
-  
-  /**
-   * Logs info information only if debug mode is enabled, otherwise logs as debug.
-   * Use this for information that's useful but might spam the console.
-   * 
-   * @param message the info message
-   * @param args the arguments for the message
-   */
-  private void infoLog(String message, Object... args) {
-    if (config != null && config.isDebugMode()) {
-      logger.info(message, args);
-    } else {
-      logger.debug(message, args);
-    }
-  }
-  
   private final VelocityServer server;
   private AntiBotConfig config;
   
@@ -135,6 +107,9 @@ public class AntiBot {
   // Map to track players in the mini-world check
   private final Map<UUID, MiniWorldSession> miniWorldSessions = new ConcurrentHashMap<>();
   
+  // Built-in verification server
+  private final VerificationServer verificationServer;
+  
   /**
    * Creates a new AntiBot instance.
    *
@@ -146,6 +121,9 @@ public class AntiBot {
     this.config = config;
     this.enabled = config.isEnabled();
     this.kickThreshold = config.getKickThreshold();
+    
+    // Initialize built-in verification server
+    this.verificationServer = new VerificationServer(server, this);
     
     logger.info("AntiBot initialized with {} checks enabled", 
         (config.isGravityCheckEnabled() ? 1 : 0) + 
@@ -234,14 +212,14 @@ public class AntiBot {
     AtomicInteger currentConnections = connectionsByIp.get(address);
     int connectionCount = currentConnections.get();
     
-    debugLog("[CONNECTION] Player {} ({}) connected from {}", 
+    logger.debug("[CONNECTION] Player {} ({}) connected from {}", 
         player.getUsername(), playerId, address.getHostAddress());
-    debugLog("[CONNECTION] IP {} now has {} active connections", 
+    logger.debug("[CONNECTION] IP {} now has {} active connections", 
         address.getHostAddress(), connectionCount);
     
     // Log virtual host information
     if (virtualHost.isPresent()) {
-      debugLog("[CONNECTION] Player {} connecting via virtual host: {}", 
+      logger.debug("[CONNECTION] Player {} connecting via virtual host: {}", 
           username, virtualHost.get());
     }
     

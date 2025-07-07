@@ -143,7 +143,7 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
   @Override
   public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
     InetAddress clientIp = getClientIp(ctx);
-    traceLog("[Layer4Handler] Reading packet from IP: {}", clientIp);
+    logger.trace("[Layer4Handler] Reading packet from IP: {}", clientIp);
 
     // Advanced lobby check - Monitor packet patterns
     logPacketAnalysisBasic(clientIp, msg);
@@ -159,8 +159,8 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
 
     // Kiểm tra kích thước packet
     if (msg instanceof MinecraftPacket) {
-      traceLog("[Layer4Handler] Processing Minecraft packet from IP: {}", clientIp);
-      traceLog("[LOBBY-CHECK] Processing Minecraft packet from IP {} in lobby environment", clientIp);
+      logger.trace("[Layer4Handler] Processing Minecraft packet from IP: {}", clientIp);
+      logger.trace("[LOBBY-CHECK] Processing Minecraft packet from IP {} in lobby environment", clientIp);
       
       if (!validatePacketSize(msg)) {
         logger.warn("[Layer4Handler] Invalid packet size from IP {}", clientIp);

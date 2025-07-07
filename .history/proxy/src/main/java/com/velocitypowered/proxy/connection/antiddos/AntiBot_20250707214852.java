@@ -70,34 +70,6 @@ public class AntiBot {
   
   private static final Logger logger = LoggerFactory.getLogger(AntiBot.class);
   
-  /**
-   * Logs debug information only if debug mode is enabled.
-   * This helps reduce console spam when debug mode is disabled.
-   * 
-   * @param message the debug message
-   * @param args the arguments for the message
-   */
-  private void debugLog(String message, Object... args) {
-    if (config != null && config.isDebugMode()) {
-      logger.debug(message, args);
-    }
-  }
-  
-  /**
-   * Logs info information only if debug mode is enabled, otherwise logs as debug.
-   * Use this for information that's useful but might spam the console.
-   * 
-   * @param message the info message
-   * @param args the arguments for the message
-   */
-  private void infoLog(String message, Object... args) {
-    if (config != null && config.isDebugMode()) {
-      logger.info(message, args);
-    } else {
-      logger.debug(message, args);
-    }
-  }
-  
   private final VelocityServer server;
   private AntiBotConfig config;
   
@@ -135,6 +107,9 @@ public class AntiBot {
   // Map to track players in the mini-world check
   private final Map<UUID, MiniWorldSession> miniWorldSessions = new ConcurrentHashMap<>();
   
+  // Built-in verification server
+  private final VerificationServer verificationServer;
+  
   /**
    * Creates a new AntiBot instance.
    *
@@ -146,6 +121,9 @@ public class AntiBot {
     this.config = config;
     this.enabled = config.isEnabled();
     this.kickThreshold = config.getKickThreshold();
+    
+    // Initialize built-in verification server
+    this.verificationServer = new VerificationServer(server, this);
     
     logger.info("AntiBot initialized with {} checks enabled", 
         (config.isGravityCheckEnabled() ? 1 : 0) + 
@@ -234,14 +212,14 @@ public class AntiBot {
     AtomicInteger currentConnections = connectionsByIp.get(address);
     int connectionCount = currentConnections.get();
     
-    debugLog("[CONNECTION] Player {} ({}) connected from {}", 
+    logger.debug("[CONNECTION] Player {} ({}) connected from {}", 
         player.getUsername(), playerId, address.getHostAddress());
-    debugLog("[CONNECTION] IP {} now has {} active connections", 
+    logger.debug("[CONNECTION] IP {} now has {} active connections", 
         address.getHostAddress(), connectionCount);
     
     // Log virtual host information
     if (virtualHost.isPresent()) {
-      debugLog("[CONNECTION] Player {} connecting via virtual host: {}", 
+      logger.debug("[CONNECTION] Player {} connecting via virtual host: {}", 
           username, virtualHost.get());
     }
     
@@ -263,9 +241,9 @@ public class AntiBot {
       logger.warn("[CONNECTION] No initial target server found for player {}", username);
     }
     
-    // If mini-world check is enabled, reroute to verification server
+    // If mini-world check is enabled, reroute to built-in verification server
     if (shouldVerify) {
-      logger.info("[VERIFICATION] Player {} requires verification, redirecting to verification world", username);
+      logger.info("[VERIFICATION] Player {} requires verification, starting built-in verification session", username);
       
       // Store the original destination for later
       initialTargetServer.ifPresent(server -> {
@@ -274,34 +252,31 @@ public class AntiBot {
             username, server.getServerInfo().getName());
       });
       
-      // Override the initial connection to go to the mini-world verification server instead
-      Optional<RegisteredServer> verificationServer = server.getServer(MINIWORLD_SERVER_NAME);
-      if (verificationServer.isPresent()) {
-        logger.info("[VERIFICATION] Directing player {} to verification world", username);
+      // Start verification session with built-in verification server
+      if (player instanceof ConnectedPlayer) {
+        ConnectedPlayer connectedPlayer = (ConnectedPlayer) player;
         
-        // Store the verification world as the initial server
-        // In ConnectedPlayer, this will override the default connection logic
-        if (player instanceof ConnectedPlayer) {
-          ConnectedPlayer connectedPlayer = (ConnectedPlayer) player;
-          // Create and fire a connection request to the verification server
-          connectedPlayer.createConnectionRequest(verificationServer.get()).fireAndForget();
+        if (verificationServer.startVerificationSession(connectedPlayer)) {
+          logger.info("[VERIFICATION] Started built-in verification session for player {}", username);
           
-          logger.debug("[VERIFICATION] Set next server to verification world for player {}", username);
+          // Create a mini-world session for tracking (for compatibility)
+          MiniWorldSession session = new MiniWorldSession(
+              playerId, 
+              username, 
+              0.0, 64.0, 0.0
+          );
+          miniWorldSessions.put(playerId, session);
+          
+          logger.debug("[VERIFICATION] Created verification session tracking for player {}", username);
+        } else {
+          logger.error("[VERIFICATION] Failed to start verification session for player {}, allowing bypass", username);
+          
+          // Mark as verified to allow connection
+          verifiedPlayers.add(playerId);
         }
-        
-        // Create a mini-world session for this player
-        MiniWorldSession session = new MiniWorldSession(
-            playerId, 
-            username, 
-            0.0, 64.0, 0.0
-        );
-        miniWorldSessions.put(playerId, session);
-        
-        logger.debug("[VERIFICATION] Created verification session for player {}", username);
       } else {
-        // Verification server not found, log warning
-        logger.warn("[VERIFICATION] Verification server '{}' not found in Velocity config. Player {} will bypass verification. Add it to your [servers] section.", 
-            MINIWORLD_SERVER_NAME, username);
+        logger.error("[VERIFICATION] Player {} is not a ConnectedPlayer instance, bypassing verification", username);
+        verifiedPlayers.add(playerId);
       }
     } else {
       if (isVerified) {

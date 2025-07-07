@@ -135,10 +135,6 @@ public class AntiBotConfig {
     return kickEnabled;
   }
   
-  public boolean isDebugMode() {
-    return debugMode;
-  }
-  
   public int getKickThreshold() {
     return kickThreshold;
   }
@@ -432,7 +428,6 @@ public class AntiBotConfig {
   public static class Builder {
     private boolean enabled = true;
     private boolean kickEnabled = true;
-    private boolean debugMode = false;
     private int kickThreshold = 5;
     private String kickMessage = "§cYou have been kicked by AntiBot protection";
     private boolean checkOnlyFirstJoin = true;
@@ -509,17 +504,6 @@ public class AntiBotConfig {
      */
     public Builder kickEnabled(boolean kickEnabled) {
       this.kickEnabled = kickEnabled;
-      return this;
-    }
-    
-    /**
-     * Sets whether debug mode is enabled for verbose logging.
-     *
-     * @param debugMode whether to enable debug mode
-     * @return this builder
-     */
-    public Builder debugMode(boolean debugMode) {
-      this.debugMode = debugMode;
       return this;
     }
     

@@ -248,9 +248,6 @@ allowed-brands = ["vanilla", "fabric", "forge", "quilt", "optifine"]
 # Enable Layer 4 (TCP/UDP) DDoS protection
 enabled = true
 
-# Enable debug mode for verbose logging (WARNING: generates a lot of console output)
-debug-mode = false
-
 # Maximum connections allowed per IP address
 max-connections-per-ip = 3
 

@@ -38,31 +38,6 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
 
   private static final Logger logger = LoggerFactory.getLogger(Layer4Handler.class);
 
-  /**
-   * Logs debug information only if debug mode is enabled.
-   * This helps reduce console spam when debug mode is disabled.
-   * 
-   * @param message the debug message
-   * @param args the arguments for the message
-   */
-  private void debugLog(String message, Object... args) {
-    if (config != null && config.debugMode) {
-      logger.debug(message, args);
-    }
-  }
-  
-  /**
-   * Logs trace information only if debug mode is enabled.
-   * 
-   * @param message the trace message
-   * @param args the arguments for the message
-   */
-  private void traceLog(String message, Object... args) {
-    if (config != null && config.debugMode) {
-      logger.trace(message, args);
-    }
-  }
-
   private final AntiDdosConfig config;
   private final long moduleStartTime = System.currentTimeMillis();
 
@@ -90,7 +65,7 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
   @Override
   public void channelActive(ChannelHandlerContext ctx) throws Exception {
     InetAddress clientIp = getClientIp(ctx);
-    debugLog("[Layer4Handler] New connection attempt from IP: {}", clientIp);
+    logger.debug("[Layer4Handler] New connection attempt from IP: {}", clientIp);
 
     // Advanced lobby check - Log client join details
     logClientJoinDetails(ctx, clientIp);
@@ -131,10 +106,10 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
     AtomicInteger connections = connectionCount.get(clientIp);
     if (connections != null) {
       connections.decrementAndGet();
-      debugLog("[Layer4Handler] Connection closed from IP: {} (Remaining connections: {})", clientIp, connections.get());
+      logger.debug("[Layer4Handler] Connection closed from IP: {} (Remaining connections: {})", clientIp, connections.get());
       if (connections.get() <= 0) {
         connectionCount.remove(clientIp);
-        debugLog("[Layer4Handler] Removed IP {} from connection tracking", clientIp);
+        logger.debug("[Layer4Handler] Removed IP {} from connection tracking", clientIp);
       }
     }
     super.channelInactive(ctx);
@@ -143,7 +118,7 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
   @Override
   public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
     InetAddress clientIp = getClientIp(ctx);
-    traceLog("[Layer4Handler] Reading packet from IP: {}", clientIp);
+    logger.trace("[Layer4Handler] Reading packet from IP: {}", clientIp);
 
     // Advanced lobby check - Monitor packet patterns
     logPacketAnalysisBasic(clientIp, msg);
@@ -159,8 +134,8 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
 
     // Kiểm tra kích thước packet
     if (msg instanceof MinecraftPacket) {
-      traceLog("[Layer4Handler] Processing Minecraft packet from IP: {}", clientIp);
-      traceLog("[LOBBY-CHECK] Processing Minecraft packet from IP {} in lobby environment", clientIp);
+      logger.trace("[Layer4Handler] Processing Minecraft packet from IP: {}", clientIp);
+      logger.trace("[LOBBY-CHECK] Processing Minecraft packet from IP {} in lobby environment", clientIp);
       
       if (!validatePacketSize(msg)) {
         logger.warn("[Layer4Handler] Invalid packet size from IP {}", clientIp);

@@ -513,17 +513,6 @@ public class AntiBotConfig {
     }
     
     /**
-     * Sets whether debug mode is enabled for verbose logging.
-     *
-     * @param debugMode whether to enable debug mode
-     * @return this builder
-     */
-    public Builder debugMode(boolean debugMode) {
-      this.debugMode = debugMode;
-      return this;
-    }
-    
-    /**
      * Sets the threshold for failed checks before taking action.
      *
      * @param kickThreshold the threshold

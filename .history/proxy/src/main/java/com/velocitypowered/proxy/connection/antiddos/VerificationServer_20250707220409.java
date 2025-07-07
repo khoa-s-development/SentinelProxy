@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 Velocity Contributors
+ * Copyright (C) 2024-2024 Velocity Contributors
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,19 +17,14 @@
 
 package com.velocitypowered.proxy.connection.antiddos;
 
-public class AntiDdosConfig {
-    public boolean debugMode = false;
-    public int maxConnectionsPerIp = 5;
-    public int maxPacketsPerSecond = 100;
-    public long rateLimitWindowMs = 1000; // 1 second
-    public long blockDurationMs = 300_000; // 5 minutes
-
-    public AntiDdosConfig() {}
-
-    public AntiDdosConfig(int maxConnectionsPerIp, int maxPacketsPerSecond, long rateLimitWindowMs, long blockDurationMs) {
-        this.maxConnectionsPerIp = maxConnectionsPerIp;
-        this.maxPacketsPerSecond = maxPacketsPerSecond;
-        this.rateLimitWindowMs = rateLimitWindowMs;
-        this.blockDurationMs = blockDurationMs;
-    }
+/**
+ * Verification server for AntiBot mini-world checks.
+ * This class handles the creation and management of verification worlds/lobbies
+ * where players must complete certain tasks to prove they are legitimate players.
+ */
+public class VerificationServer {
+  
+  // TODO: Implement verification server functionality
+  // This is a placeholder class for future implementation
+  
 }

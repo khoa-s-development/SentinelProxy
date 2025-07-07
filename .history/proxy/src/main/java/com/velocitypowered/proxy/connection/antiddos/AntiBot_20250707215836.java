@@ -234,14 +234,14 @@ public class AntiBot {
     AtomicInteger currentConnections = connectionsByIp.get(address);
     int connectionCount = currentConnections.get();
     
-    debugLog("[CONNECTION] Player {} ({}) connected from {}", 
+    logger.debug("[CONNECTION] Player {} ({}) connected from {}", 
         player.getUsername(), playerId, address.getHostAddress());
-    debugLog("[CONNECTION] IP {} now has {} active connections", 
+    logger.debug("[CONNECTION] IP {} now has {} active connections", 
         address.getHostAddress(), connectionCount);
     
     // Log virtual host information
     if (virtualHost.isPresent()) {
-      debugLog("[CONNECTION] Player {} connecting via virtual host: {}", 
+      logger.debug("[CONNECTION] Player {} connecting via virtual host: {}", 
           username, virtualHost.get());
     }
     

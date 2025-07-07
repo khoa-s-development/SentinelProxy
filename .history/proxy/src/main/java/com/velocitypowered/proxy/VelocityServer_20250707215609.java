@@ -1131,7 +1131,6 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     return AntiBotConfig.builder()
         .enabled(true)
         .kickEnabled(false) // Start with warnings only
-        .debugMode(false) // Disable debug mode by default
         .checkOnlyFirstJoin(true)
         .gravityCheckEnabled(false) // Disable intensive checks by default
         .hitboxCheckEnabled(false)
@@ -1165,7 +1164,6 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
     return AntiBotConfig.builder()
         .enabled(true)
         .kickEnabled(false) // Start with logging only
-        .debugMode(false) // Disable debug mode by default
         .checkOnlyFirstJoin(true)
         .gravityCheckEnabled(false)
         .hitboxCheckEnabled(false)
@@ -1290,7 +1288,6 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
   private AntiDdosConfig createLayer4ConfigFromVelocityConfig() {
     try {
       boolean enabled = getBooleanFromConfig("layer4-protection.enabled", true);
-      boolean debugMode = getBooleanFromConfig("layer4-protection.debug-mode", false);
       int maxConnectionsPerIp = getIntFromConfig("layer4-protection.max-connections-per-ip", 3);
       int maxPacketsPerSecond = getIntFromConfig("layer4-protection.max-packets-per-second", 100);
       int rateLimitWindowMs = getIntFromConfig("layer4-protection.rate-limit-window-ms", 1000);
@@ -1298,7 +1295,6 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
       boolean advancedLoggingEnabled = getBooleanFromConfig("layer4-protection.advanced-logging-enabled", true);
 
       AntiDdosConfig config = new AntiDdosConfig();
-      config.debugMode = debugMode;
       config.maxConnectionsPerIp = maxConnectionsPerIp;
       config.maxPacketsPerSecond = maxPacketsPerSecond;
       config.rateLimitWindowMs = rateLimitWindowMs;
