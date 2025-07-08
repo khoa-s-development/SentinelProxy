@@ -24,3 +24,7 @@ SentinalsProxy is a fork of Velocity, a proxy server for Minecraft servers. Unli
 - Faster booting than stable (4.9s -> 3.1s).
 - Antibot check (username, UUID, tag, brands, packet, gravity, lobby check).
 - DynamicServer allows adding servers directly without needing to restart, ensuring continuous uptime and supporting forced hosts (hostname).
+
+## Usage
+### Stable release/Snapshot release
+
