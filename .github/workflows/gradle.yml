@@ -19,5 +19,7 @@ jobs:
       with:
         java-version: 21
         distribution: 'zulu'
+    - name: spotless
+      run: ./gradlew :sentinals-proxy:spotlessApply
     - name: Build with Gradle
-      run: ./gradlew build
+      run: ./gradlew clean build
