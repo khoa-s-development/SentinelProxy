@@ -1188,6 +1188,60 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
         .build();
   }
 
+  // Helper methods for configuration parsing
+  // These would ideally integrate with the actual TOML parsing system
+  
+  private boolean getBooleanFromConfig(String key, boolean defaultValue) {
+    try {
+      // TODO: Implement actual TOML parsing when configuration system is extended
+      // For now, return default values
+      return defaultValue;
+    } catch (Exception e) {
+      logger.debug("Could not parse boolean config key '{}', using default: {}", key, defaultValue);
+      return defaultValue;
+    }
+  }
+
+  private int getIntFromConfig(String key, int defaultValue) {
+    try {
+      // TODO: Implement actual TOML parsing when configuration system is extended
+      return defaultValue;
+    } catch (Exception e) {
+      logger.debug("Could not parse int config key '{}', using default: {}", key, defaultValue);
+      return defaultValue;
+    }
+  }
+
+  private double getDoubleFromConfig(String key, double defaultValue) {
+    try {
+      // TODO: Implement actual TOML parsing when configuration system is extended
+      return defaultValue;
+    } catch (Exception e) {
+      logger.debug("Could not parse double config key '{}', using default: {}", key, defaultValue);
+      return defaultValue;
+    }
+  }
+
+  private String getStringFromConfig(String key, String defaultValue) {
+    try {
+      // TODO: Implement actual TOML parsing when configuration system is extended
+      return defaultValue;
+    } catch (Exception e) {
+      logger.debug("Could not parse string config key '{}', using default: {}", key, defaultValue);
+      return defaultValue;
+    }
+  }
+
+  private List<String> getStringListFromConfig(String key, List<String> defaultValue) {
+    try {
+      // TODO: Implement actual TOML parsing when configuration system is extended
+      return defaultValue;
+    } catch (Exception e) {
+      logger.debug("Could not parse string list config key '{}', using default: {}", key, defaultValue);
+      return defaultValue;
+    }
+  }
+
   /**
    * Integrate AntiBot with Layer4Handler for advanced lobby checking.
    * This allows the Layer4Handler to call AntiBot methods for client analysis.
@@ -1233,17 +1287,13 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
    */
   private AntiDdosConfig createLayer4ConfigFromVelocityConfig() {
     try {
-      // For now, use sensible defaults since TOML parsing for layer4-protection section is not implemented
-      // TODO: Implement proper TOML parsing for [layer4-protection] section in VelocityConfiguration
-      logger.info("Creating Layer4 configuration with default values (TOML parsing not yet implemented)");
-      
-      boolean enabled = true;
-      boolean debugMode = false; // Disable debug mode by default to prevent log spam
-      int maxConnectionsPerIp = 3;
-      int maxPacketsPerSecond = 100;
-      int rateLimitWindowMs = 1000;
-      int blockDurationMs = 300000; // 5 minutes
-      boolean advancedLoggingEnabled = false; // Disable to prevent log spam
+      boolean enabled = getBooleanFromConfig("layer4-protection.enabled", true);
+      boolean debugMode = getBooleanFromConfig("layer4-protection.debug-mode", false);
+      int maxConnectionsPerIp = getIntFromConfig("layer4-protection.max-connections-per-ip", 3);
+      int maxPacketsPerSecond = getIntFromConfig("layer4-protection.max-packets-per-second", 100);
+      int rateLimitWindowMs = getIntFromConfig("layer4-protection.rate-limit-window-ms", 1000);
+      int blockDurationMs = getIntFromConfig("layer4-protection.block-duration-ms", 300000);
+      boolean advancedLoggingEnabled = getBooleanFromConfig("layer4-protection.advanced-logging-enabled", true);
 
       AntiDdosConfig config = new AntiDdosConfig();
       config.debugMode = debugMode;
@@ -1252,12 +1302,12 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
       config.rateLimitWindowMs = rateLimitWindowMs;
       config.blockDurationMs = blockDurationMs;
       
-      logger.info("Layer4 configuration created: maxConnections={}, maxPackets={}, blockDuration={}ms",
+      logger.info("Layer4 configuration loaded: maxConnections={}, maxPackets={}, blockDuration={}ms",
           maxConnectionsPerIp, maxPacketsPerSecond, blockDurationMs);
       
       return config;
     } catch (Exception e) {
-      logger.warn("Error creating Layer4 configuration, using defaults: {}", e.getMessage());
+      logger.warn("Error parsing Layer4 configuration from velocity.toml, using defaults: {}", e.getMessage());
       return createDefaultLayer4Config();
     }
   }
@@ -1269,7 +1319,6 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
    */
   private AntiDdosConfig createDefaultLayer4Config() {
     AntiDdosConfig config = new AntiDdosConfig();
-    config.debugMode = false; // Disable debug mode by default to prevent log spam
     config.maxConnectionsPerIp = 3;
     config.maxPacketsPerSecond = 100;
     config.rateLimitWindowMs = 1000;

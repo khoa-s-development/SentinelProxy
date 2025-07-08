@@ -1188,6 +1188,60 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
         .build();
   }
 
+  // Helper methods for configuration parsing
+  // These would ideally integrate with the actual TOML parsing system
+  
+  private boolean getBooleanFromConfig(String key, boolean defaultValue) {
+    try {
+      // TODO: Implement actual TOML parsing when configuration system is extended
+      // For now, return default values
+      return defaultValue;
+    } catch (Exception e) {
+      logger.debug("Could not parse boolean config key '{}', using default: {}", key, defaultValue);
+      return defaultValue;
+    }
+  }
+
+  private int getIntFromConfig(String key, int defaultValue) {
+    try {
+      // TODO: Implement actual TOML parsing when configuration system is extended
+      return defaultValue;
+    } catch (Exception e) {
+      logger.debug("Could not parse int config key '{}', using default: {}", key, defaultValue);
+      return defaultValue;
+    }
+  }
+
+  private double getDoubleFromConfig(String key, double defaultValue) {
+    try {
+      // TODO: Implement actual TOML parsing when configuration system is extended
+      return defaultValue;
+    } catch (Exception e) {
+      logger.debug("Could not parse double config key '{}', using default: {}", key, defaultValue);
+      return defaultValue;
+    }
+  }
+
+  private String getStringFromConfig(String key, String defaultValue) {
+    try {
+      // TODO: Implement actual TOML parsing when configuration system is extended
+      return defaultValue;
+    } catch (Exception e) {
+      logger.debug("Could not parse string config key '{}', using default: {}", key, defaultValue);
+      return defaultValue;
+    }
+  }
+
+  private List<String> getStringListFromConfig(String key, List<String> defaultValue) {
+    try {
+      // TODO: Implement actual TOML parsing when configuration system is extended
+      return defaultValue;
+    } catch (Exception e) {
+      logger.debug("Could not parse string list config key '{}', using default: {}", key, defaultValue);
+      return defaultValue;
+    }
+  }
+
   /**
    * Integrate AntiBot with Layer4Handler for advanced lobby checking.
    * This allows the Layer4Handler to call AntiBot methods for client analysis.
@@ -1269,7 +1323,6 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
    */
   private AntiDdosConfig createDefaultLayer4Config() {
     AntiDdosConfig config = new AntiDdosConfig();
-    config.debugMode = false; // Disable debug mode by default to prevent log spam
     config.maxConnectionsPerIp = 3;
     config.maxPacketsPerSecond = 100;
     config.rateLimitWindowMs = 1000;

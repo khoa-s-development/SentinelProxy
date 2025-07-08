@@ -21,6 +21,7 @@ import com.velocitypowered.api.event.PostOrder;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.DisconnectEvent;
 import com.velocitypowered.api.event.ResultedEvent;
+import java.util.concurrent.CompletableFuture;
 import com.velocitypowered.api.event.connection.LoginEvent;
 import com.velocitypowered.api.event.player.PlayerChatEvent;
 import com.velocitypowered.api.event.connection.PluginMessageEvent;
@@ -33,6 +34,8 @@ import com.velocitypowered.proxy.VelocityServer;
 import com.velocitypowered.proxy.connection.client.ConnectedPlayer;
 import com.velocitypowered.proxy.protocol.packet.PluginMessagePacket;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
@@ -40,6 +43,7 @@ import io.netty.channel.ChannelHandlerContext;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Map;
+import java.util.Iterator;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.Set;
@@ -48,6 +52,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 import java.util.LinkedList;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -93,84 +98,6 @@ public class AntiBot {
     } else {
       logger.debug(message, args);
     }
-  }
-  
-  /**
-   * Determines the initial server a player should be sent to.
-   * This is based on the server's configuration for forced hosts
-   * and the order of servers in the configuration.
-   *
-   * @param player the player
-   * @return the initial server, or empty if none found
-   */
-  private Optional<RegisteredServer> determineInitialServer(Player player) {
-    // This is a simplified version of the logic. A real implementation might
-    // involve more complex rules for determining the initial server.
-    return server.getAllServers().stream().findFirst();
-  }
-
-  /**
-   * Checks if an IP address is currently throttled due to too many connections.
-   *
-   * @param address the IP address to check
-   * @return true if the IP is throttled, false otherwise
-   */
-  private boolean isIpThrottled(InetAddress address) {
-    return throttledIps.contains(address);
-  }
-
-  /**
-   * Checks if the connection rate from an IP address exceeds the configured limit.
-   *
-   * @param address the IP address to check
-   * @return true if the connection rate is within limits, false otherwise
-   */
-  private boolean checkConnectionRate(InetAddress address) {
-    if (config.getConnectionRateLimit() <= 0) {
-      return true; // Rate limiting is disabled
-    }
-    long now = System.currentTimeMillis();
-    List<Long> timestamps = connectionTimestampsByIp.computeIfAbsent(address, k -> new ArrayList<>());
-    timestamps.add(now);
-    // Remove timestamps older than the configured window
-    timestamps.removeIf(ts -> now - ts > config.getConnectionRateWindowMs());
-    if (timestamps.size() > config.getConnectionRateLimit()) {
-      // Throttle this IP
-      throttledIps.add(address);
-      return false;
-    }
-    return true;
-  }
-
-  /**
-   * Checks if a username matches a suspicious pattern.
-   *
-   * @param username the username to check
-   * @return true if the username is not suspicious, false otherwise
-   */
-  private boolean checkUsernamePattern(String username) {
-    if (!config.isUsernamePatternCheckEnabled()) {
-      return true;
-    }
-    // Example check: block usernames with "bot" in them (case-insensitive)
-    if (username.toLowerCase().contains("bot")) {
-      return false;
-    }
-    return true;
-  }
-
-  /**
-   * Checks if the DNS resolution for a given address and hostname is valid.
-   * This is a placeholder for a more complex DNS check.
-   *
-   * @param address the IP address
-   * @param hostname the hostname
-   * @return true if the DNS resolution is valid, false otherwise
-   */
-  private boolean checkDnsResolution(InetAddress address, String hostname) {
-    // This is a simplified check. A real implementation might involve
-    // reverse DNS lookups or checking against a whitelist/blacklist.
-    return true;
   }
   
   private final VelocityServer server;
@@ -1050,34 +977,6 @@ public class AntiBot {
   }
   
   /**
-   * Processes player movement within the mini-world verification.
-   *
-   * @param player the player
-   * @param x the new x-coordinate
-   * @param y the new y-coordinate
-   * @param z the new z-coordinate
-   */
-  private void processMiniWorldMovement(ConnectedPlayer player, double x, double y, double z) {
-    MiniWorldSession session = miniWorldSessions.get(player.getUniqueId());
-    if (session != null) {
-      session.incrementMovement();
-      session.updatePosition(x, y, z);
-    }
-  }
-
-  /**
-   * Processes player interaction within the mini-world verification.
-   *
-   * @param player the player
-   */
-  private void processMiniWorldInteraction(ConnectedPlayer player) {
-    MiniWorldSession session = miniWorldSessions.get(player.getUniqueId());
-    if (session != null) {
-      session.incrementInteraction();
-    }
-  }
-  
-  /**
    * Configure the AntiBot with new settings.
    *
    * @param config the new configuration
@@ -1299,11 +1198,11 @@ public class AntiBot {
     private double maxDistanceFromStart;
     private double totalDistance;
     
-    public int movementCount;
-    public int interactionCount;
-    public boolean hasJumped;
+    int movementCount;
+    int interactionCount;
+    boolean hasJumped;
     boolean hasCrouched;
-    public boolean hasInteracted;
+    boolean hasInteracted;
     boolean checkPassed;
     boolean completed;
     private final Queue<Long> moveTimestamps = new LinkedList<>();
@@ -1542,7 +1441,7 @@ public class AntiBot {
     public boolean hasJumped() {
       return hasJumped;
     }
-
+    
     /**
      * Gets whether the player has interacted during verification.
      *
@@ -1551,138 +1450,286 @@ public class AntiBot {
     public boolean hasInteracted() {
       return hasInteracted;
     }
-    
-    /**
-     * Gets the movement count.
-     *
-     * @return the number of movements recorded
-     */
-    public int getMovementCount() {
-      return movementCount;
-    }
   }
   
   /**
-   * Public accessor for the verified players set.
+   * Gets all active mini-world sessions.
    *
-   * @return the set of verified player UUIDs
-   */
-  public Set<UUID> getVerifiedPlayers() {
-    return new HashSet<>(verifiedPlayers);
-  }
-
-  /**
-   * Public accessor for the mini-world sessions map.
-   *
-   * @return a copy of the mini-world sessions map
+   * @return map of player UUIDs to mini-world sessions
    */
   public Map<UUID, MiniWorldSession> getMiniWorldSessions() {
-    return new ConcurrentHashMap<>(miniWorldSessions);
+    return miniWorldSessions;
   }
-
+  
   /**
-   * Get a specific mini-world session for a player.
+   * Gets a mini-world session for a specific player.
    *
-   * @param playerId the UUID of the player
+   * @param playerId the player UUID
    * @return the mini-world session, or null if not found
    */
   public MiniWorldSession getMiniWorldSession(UUID playerId) {
     return miniWorldSessions.get(playerId);
   }
-
+  
   /**
-   * Completes the verification process for a player and transfers them to their target server.
+   * Gets the set of verified player UUIDs.
    *
-   * @param player the player who completed verification
-   * @param targetServer the server to transfer the player to
+   * @return set of verified player UUIDs
    */
-  private void completeVerification(Player player, RegisteredServer targetServer) {
-    UUID playerId = player.getUniqueId();
-    String username = player.getUsername();
-
-    verifiedPlayers.add(playerId);
-    suspiciousPlayers.remove(playerId);
-    failedChecks.remove(playerId);
-    miniWorldSessions.remove(playerId);
-
-    logger.info("[VERIFICATION] Player {} successfully completed verification.", username);
-
-    transferToTargetServer(player, targetServer);
+  public Set<UUID> getVerifiedPlayers() {
+    return verifiedPlayers;
   }
-
+  
   /**
-   * Handles a failed verification attempt. Depending on the configuration, this will
-   * either kick the player or allow them to connect while marked as suspicious.
+   * Check if an IP address is currently throttled.
    *
-   * @param player the player who failed verification
+   * @param address the IP address to check
+   * @return true if throttled, false otherwise
    */
-  private void handleFailedVerification(Player player) {
-    UUID playerId = player.getUniqueId();
-    String username = player.getUsername();
-
-    suspiciousPlayers.add(playerId);
-    miniWorldSessions.remove(playerId);
-    virtualWorld.exitVerificationWorld((ConnectedPlayer) player);
-
-    if (config.isKickOnVerificationFail()) {
-      logger.info("[VERIFICATION] Kicking player {} for failing verification.", username);
-      player.disconnect(Component.text(config.getKickMessage()));
-    } else {
-      logger.warn("[VERIFICATION] Player {} failed verification but is being allowed to connect.",
-          username);
-      // Find original destination or a fallback and transfer the player
-      RegisteredServer destination = originalDestinations.get(playerId);
-      if (destination == null) {
-        Optional<RegisteredServer> fallback = server.getServer(MINIWORLD_FALLBACK_SERVER)
-            .or(() -> server.getAllServers().stream().findFirst());
-        if (fallback.isPresent()) {
-          destination = fallback.get();
-        } else {
-          player.disconnect(Component.text("Could not find a server to connect to."));
-          return;
+  private boolean isIpThrottled(InetAddress address) {
+    return throttledIps.contains(address);
+  }
+  
+  /**
+   * Check if the connection rate for an IP address is acceptable.
+   *
+   * @param address the IP address to check
+   * @return true if rate is acceptable, false if too many connections
+   */
+  private boolean checkConnectionRate(InetAddress address) {
+    // Get or create timestamp list for this IP
+    List<Long> timestamps = connectionTimestampsByIp.computeIfAbsent(
+        address, k -> new ArrayList<>());
+    
+    // Add current timestamp
+    long now = System.currentTimeMillis();
+    timestamps.add(now);
+    
+    // Remove timestamps older than 1 minute
+    timestamps.removeIf(ts -> now - ts > TimeUnit.MINUTES.toMillis(1));
+    
+    // Check if we've exceeded the rate limit
+    if (timestamps.size() > config.getMaxConnectionsPerMinute()) {
+      throttledIps.add(address);
+      logger.warn("IP {} exceeded connection rate limit: {} connections/minute", 
+          address.getHostAddress(), timestamps.size());
+      return false;
+    }
+    
+    return true;
+  }
+  
+  /**
+   * Check if username matches suspicious patterns.
+   *
+   * @param username the username to check
+   * @return true if username is acceptable, false if suspicious
+   */
+  private boolean checkUsernamePattern(String username) {
+    // Check for common bot patterns (random characters)
+    boolean suspicious = false;
+    
+    // Check for sequential characters (e.g., "abcdefg")
+    if (hasSequentialChars(username, 5)) {
+      suspicious = true;
+      usernamePatterns.add("sequential");
+    }
+    
+    // Check for repeating patterns (e.g., "abcabc")
+    if (hasRepeatingPattern(username)) {
+      suspicious = true;
+      usernamePatterns.add("repeating");
+    }
+    
+    // Check for random character mix (e.g., "xj92kd")
+    if (hasRandomCharMix(username)) {
+      suspicious = true;
+      usernamePatterns.add("random");
+    }
+    
+    if (suspicious) {
+      // Count username patterns
+      for (String pattern : usernamePatterns) {
+        usernamePatternCounts.put(pattern, usernamePatternCounts.getOrDefault(pattern, 0) + 1);
+      }
+      
+      logger.debug("Username {} matched suspicious patterns: {}", username, usernamePatterns);
+      return false;
+    }
+    
+    return true;
+  }
+  
+  /**
+   * Utility method to check for sequential characters
+   */
+  private boolean hasSequentialChars(String s, int minLength) {
+    if (s.length() < minLength) return false;
+    
+    for (int i = 0; i < s.length() - minLength + 1; i++) {
+      boolean sequential = true;
+      for (int j = i + 1; j < i + minLength; j++) {
+        if (s.charAt(j) != s.charAt(j-1) + 1) {
+          sequential = false;
+          break;
         }
       }
-      transferToTargetServer(player, destination);
+      if (sequential) return true;
     }
+    return false;
   }
-
+  
   /**
-   * Transfers a player to their target server after they have passed verification.
-   *
-   * @param player the player to transfer
-   * @param targetServer the destination server
+   * Utility method to check for repeating patterns
    */
-  private void transferToTargetServer(Player player, RegisteredServer targetServer) {
-    UUID playerId = player.getUniqueId();
-    String username = player.getUsername();
-
-    logger.info("[TRANSFER] Transferring player {} to server {}.",
-        username, targetServer.getServerInfo().getName());
-
-    virtualWorld.exitVerificationWorld((ConnectedPlayer) player);
-    originalDestinations.remove(playerId);
-    pendingTransfers.add(playerId);
-
-    player.createConnectionRequest(targetServer).fireAndForget();
+  private boolean hasRepeatingPattern(String s) {
+    if (s.length() < 4) return false;
+    
+    for (int patternLen = 2; patternLen <= s.length() / 2; patternLen++) {
+      String pattern = s.substring(0, patternLen);
+      boolean repeating = true;
+      
+      for (int i = patternLen; i < s.length(); i += patternLen) {
+        int endIndex = Math.min(i + patternLen, s.length());
+        if (!pattern.equals(s.substring(i, endIndex))) {
+          repeating = false;
+          break;
+        }
+      }
+      
+      if (repeating) return true;
+    }
+    return false;
   }
-
+  
   /**
-   * Overloaded method to transfer a player to their original destination or a fallback.
-   *
-   * @param player the player to transfer
+   * Utility method to check for random character mix (e.g., mix of letters and numbers with no pattern)
    */
-  private void transferToTargetServer(Player player) {
-    RegisteredServer destination = originalDestinations.get(player.getUniqueId());
-    if (destination == null) {
-      Optional<RegisteredServer> fallback = server.getServer(MINIWORLD_FALLBACK_SERVER)
-          .or(() -> server.getAllServers().stream().findFirst());
-      if (fallback.isPresent()) {
-        destination = fallback.get();
-      } else {
-        player.disconnect(Component.text("Could not find a server to connect to."));
-        return;
+  private boolean hasRandomCharMix(String s) {
+    if (s.length() < 5) return false;
+    
+    boolean hasDigit = false;
+    boolean hasLetter = false;
+    int transitions = 0;
+    boolean lastWasDigit = Character.isDigit(s.charAt(0));
+    
+    for (char c : s.toCharArray()) {
+      if (Character.isDigit(c)) {
+        hasDigit = true;
+        if (!lastWasDigit) {
+          transitions++;
+          lastWasDigit = true;
+        }
+      } else if (Character.isLetter(c)) {
+        hasLetter = true;
+        if (lastWasDigit) {
+          transitions++;
+          lastWasDigit = false;
+        }
       }
     }
-    transferToTargetServer(player, destination);
+    
+    // If we have both digits and letters with multiple transitions, it's likely random
+    return hasDigit && hasLetter && transitions >= 3;
+  }
+  
+  /**
+   * Check if DNS resolution is valid for the given address and hostname.
+   *
+   * @param address the IP address
+   * @param hostname the hostname to check
+   * @return true if DNS resolution is valid, false otherwise
+   */
+  private boolean checkDnsResolution(InetAddress address, String hostname) {
+    // Skip for localhost and direct IP connections
+    if (hostname.equals("localhost") || hostname.matches("\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}")) {
+      return true;
+    }
+    
+    // Check if this hostname has already been resolved
+    if (dnsResolveCache.containsKey(address)) {
+      return hostname.equals(dnsResolveCache.get(address));
+    }
+    
+    try {
+      // Try to resolve the hostname
+      InetAddress[] addresses = InetAddress.getAllByName(hostname);
+      
+      // Check if our address is in the results
+      boolean resolved = false;
+      for (InetAddress addr : addresses) {
+        if (addr.equals(address)) {
+          resolved = true;
+          break;
+        }
+      }
+      
+      // Cache the result
+      if (resolved) {
+        dnsResolveCache.put(address, hostname);
+        resolvedAddresses.add(address);
+        return true;
+      } else {
+        logger.debug("DNS check failed for {} - hostname {} did not resolve to this address", 
+            address.getHostAddress(), hostname);
+        return false;
+      }
+    } catch (Exception e) {
+      logger.debug("DNS check failed for {} - couldn't resolve hostname {}: {}", 
+          address.getHostAddress(), hostname, e.getMessage());
+      return false;
+    }
+  }
+  
+  /**
+   * Determine the initial server for a player connection.
+   * 
+   * @param player the player to find a server for
+   * @return the server to connect to, or empty if no valid server
+   */
+  private Optional<RegisteredServer> determineInitialServer(Player player) {
+    // First try to get the player's intended server
+    Optional<String> virtualHost = player.getVirtualHost()
+        .map(InetSocketAddress::getHostString);
+    
+    // Try to match a forced host
+    if (virtualHost.isPresent()) {
+      String hostname = virtualHost.get();
+      
+      for (Map.Entry<String, String> entry : server.getConfiguration().getForcedHosts().entrySet()) {
+        if (hostname.equalsIgnoreCase(entry.getKey())) {
+          String serverName = entry.getValue();
+          Optional<RegisteredServer> forcedServer = server.getServer(serverName);
+          if (forcedServer.isPresent()) {
+            logger.debug("Player {} will connect to forced host server {}", 
+                player.getUsername(), serverName);
+            return forcedServer;
+          }
+        }
+      }
+    }
+    
+    // If no forced host match, use the first server in the try order
+    List<String> serverTryOrder = server.getConfiguration().getAttemptConnectionOrder();
+    if (!serverTryOrder.isEmpty()) {
+      String firstServerName = serverTryOrder.get(0);
+      Optional<RegisteredServer> firstServer = server.getServer(firstServerName);
+      if (firstServer.isPresent()) {
+        logger.debug("Player {} will connect to first available server {}", 
+            player.getUsername(), firstServerName);
+        return firstServer;
+      }
+    }
+    
+    // Last resort, try to find any available server
+    Optional<RegisteredServer> anyServer = server.getAllServers().stream().findFirst();
+    if (anyServer.isPresent()) {
+      logger.debug("Player {} will connect to any available server {}", 
+          player.getUsername(), anyServer.get().getServerInfo().getName());
+    } else {
+      logger.error("No server available for player {}", player.getUsername());
+    }
+    
+    return anyServer;
   }
 }

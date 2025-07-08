@@ -62,18 +62,6 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
       logger.trace(message, args);
     }
   }
-  
-  /**
-   * Logs info messages only if debug mode is enabled.
-   * 
-   * @param message the info message
-   * @param args the arguments for the message
-   */
-  private void debugInfo(String message, Object... args) {
-    if (config != null && config.debugMode) {
-      logger.info(message, args);
-    }
-  }
 
   private final AntiDdosConfig config;
   private final long moduleStartTime = System.currentTimeMillis();
@@ -110,7 +98,7 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
     // Kiểm tra IP có bị chặn không
     if (isBlocked(clientIp)) {
       logger.warn("[Layer4Handler] Blocked IP {} attempted to connect", clientIp);
-      debugInfo("[LOBBY-CHECK] Blocked IP {} rejected before lobby entry", clientIp);
+      logger.warn("[LOBBY-CHECK] Blocked IP {} rejected before lobby entry", clientIp);
       ctx.close();
       return;
     }
@@ -121,14 +109,14 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
     if (connections.incrementAndGet() > config.maxConnectionsPerIp) {
       logger.warn("[Layer4Handler] IP {} exceeded connection limit ({}/{}), blocking", 
           clientIp, connections.get(), config.maxConnectionsPerIp);
-      debugInfo("[LOBBY-CHECK] IP {} blocked for exceeding connection limit during lobby entry", clientIp);
+      logger.warn("[LOBBY-CHECK] IP {} blocked for exceeding connection limit during lobby entry", clientIp);
       blockIp(clientIp);
       ctx.close();
       return;
     }
 
     logger.info("[Layer4Handler] New connection established from IP: {} (Total connections: {})", clientIp, connections.get());
-    debugInfo("[LOBBY-CHECK] Client from IP {} successfully entered lobby (Connection #{} for this IP)", 
+    logger.info("[LOBBY-CHECK] Client from IP {} successfully entered lobby (Connection #{} for this IP)", 
         clientIp, connections.get());
     
     // Advanced client analysis
@@ -366,27 +354,27 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
       String hostAddress = clientIp.getHostAddress();
       String hostName = clientIp.getCanonicalHostName();
       
-      debugInfo("[LOBBY-CHECK] Client join details:");
-      debugInfo("[LOBBY-CHECK]   IP Address: {}", hostAddress);
-      debugInfo("[LOBBY-CHECK]   Hostname: {}", hostName);
-      debugInfo("[LOBBY-CHECK]   Channel ID: {}", ctx.channel().id().asShortText());
-      debugInfo("[LOBBY-CHECK]   Local Address: {}", ctx.channel().localAddress());
-      debugInfo("[LOBBY-CHECK]   Remote Address: {}", ctx.channel().remoteAddress());
-      debugInfo("[LOBBY-CHECK]   Connection Time: {}", System.currentTimeMillis());
+      logger.info("[LOBBY-CHECK] Client join details:");
+      logger.info("[LOBBY-CHECK]   IP Address: {}", hostAddress);
+      logger.info("[LOBBY-CHECK]   Hostname: {}", hostName);
+      logger.info("[LOBBY-CHECK]   Channel ID: {}", ctx.channel().id().asShortText());
+      logger.info("[LOBBY-CHECK]   Local Address: {}", ctx.channel().localAddress());
+      logger.info("[LOBBY-CHECK]   Remote Address: {}", ctx.channel().remoteAddress());
+      logger.info("[LOBBY-CHECK]   Connection Time: {}", System.currentTimeMillis());
       
       // Check for suspicious patterns
       if (hostAddress.equals(hostName)) {
-        debugLog("[LOBBY-CHECK]   No reverse DNS available for {}", hostAddress);
+        logger.debug("[LOBBY-CHECK]   No reverse DNS available for {}", hostAddress);
       } else {
-        debugLog("[LOBBY-CHECK]   Reverse DNS resolved: {} -> {}", hostAddress, hostName);
+        logger.debug("[LOBBY-CHECK]   Reverse DNS resolved: {} -> {}", hostAddress, hostName);
       }
       
       // Log connection frequency
       AtomicInteger existingConnections = connectionCount.get(clientIp);
       if (existingConnections != null && existingConnections.get() > 0) {
-        debugInfo("[LOBBY-CHECK]   Existing connections from this IP: {}", existingConnections.get());
+        logger.info("[LOBBY-CHECK]   Existing connections from this IP: {}", existingConnections.get());
       } else {
-        debugInfo("[LOBBY-CHECK]   First connection from this IP");
+        logger.info("[LOBBY-CHECK]   First connection from this IP");
       }
       
     } catch (Exception e) {
@@ -578,7 +566,7 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
    * @return A risk score from 0.0 (legitimate) to 1.0 (highly suspicious)
    */
   public double performAdvancedClientAnalysis(InetAddress clientIp, String username, String behaviorFlags) {
-    debugInfo("[Layer4Handler] [ADVANCED-ANALYSIS] Starting comprehensive client analysis for {}", clientIp.getHostAddress());
+    logger.info("[Layer4Handler] [ADVANCED-ANALYSIS] Starting comprehensive client analysis for {}", clientIp.getHostAddress());
     
     double riskScore = 0.0;
     StringBuilder analysis = new StringBuilder();
@@ -645,7 +633,7 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
       logger.warn(analysis.toString());
     } else {
       analysis.append(" [LOW RISK - LIKELY LEGITIMATE]");
-      debugInfo(analysis.toString());
+      logger.info(analysis.toString());
     }
     
     return riskScore;

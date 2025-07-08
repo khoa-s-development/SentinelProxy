@@ -645,7 +645,7 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
       logger.warn(analysis.toString());
     } else {
       analysis.append(" [LOW RISK - LIKELY LEGITIMATE]");
-      debugInfo(analysis.toString());
+      logger.info(analysis.toString());
     }
     
     return riskScore;

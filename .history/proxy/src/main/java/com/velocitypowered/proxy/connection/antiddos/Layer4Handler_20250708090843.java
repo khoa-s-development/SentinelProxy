@@ -121,7 +121,7 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
     if (connections.incrementAndGet() > config.maxConnectionsPerIp) {
       logger.warn("[Layer4Handler] IP {} exceeded connection limit ({}/{}), blocking", 
           clientIp, connections.get(), config.maxConnectionsPerIp);
-      debugInfo("[LOBBY-CHECK] IP {} blocked for exceeding connection limit during lobby entry", clientIp);
+      logger.warn("[LOBBY-CHECK] IP {} blocked for exceeding connection limit during lobby entry", clientIp);
       blockIp(clientIp);
       ctx.close();
       return;
@@ -578,7 +578,7 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
    * @return A risk score from 0.0 (legitimate) to 1.0 (highly suspicious)
    */
   public double performAdvancedClientAnalysis(InetAddress clientIp, String username, String behaviorFlags) {
-    debugInfo("[Layer4Handler] [ADVANCED-ANALYSIS] Starting comprehensive client analysis for {}", clientIp.getHostAddress());
+    logger.info("[Layer4Handler] [ADVANCED-ANALYSIS] Starting comprehensive client analysis for {}", clientIp.getHostAddress());
     
     double riskScore = 0.0;
     StringBuilder analysis = new StringBuilder();
@@ -645,7 +645,7 @@ public class Layer4Handler extends ChannelInboundHandlerAdapter {
       logger.warn(analysis.toString());
     } else {
       analysis.append(" [LOW RISK - LIKELY LEGITIMATE]");
-      debugInfo(analysis.toString());
+      logger.info(analysis.toString());
     }
     
     return riskScore;

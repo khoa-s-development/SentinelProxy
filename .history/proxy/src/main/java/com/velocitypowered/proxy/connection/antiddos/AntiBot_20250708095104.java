@@ -21,6 +21,7 @@ import com.velocitypowered.api.event.PostOrder;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.DisconnectEvent;
 import com.velocitypowered.api.event.ResultedEvent;
+import java.util.concurrent.CompletableFuture;
 import com.velocitypowered.api.event.connection.LoginEvent;
 import com.velocitypowered.api.event.player.PlayerChatEvent;
 import com.velocitypowered.api.event.connection.PluginMessageEvent;
@@ -33,6 +34,8 @@ import com.velocitypowered.proxy.VelocityServer;
 import com.velocitypowered.proxy.connection.client.ConnectedPlayer;
 import com.velocitypowered.proxy.protocol.packet.PluginMessagePacket;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
@@ -40,14 +43,14 @@ import io.netty.channel.ChannelHandlerContext;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Map;
+import java.util.Iterator;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Queue;
-import java.util.LinkedList;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -93,84 +96,6 @@ public class AntiBot {
     } else {
       logger.debug(message, args);
     }
-  }
-  
-  /**
-   * Determines the initial server a player should be sent to.
-   * This is based on the server's configuration for forced hosts
-   * and the order of servers in the configuration.
-   *
-   * @param player the player
-   * @return the initial server, or empty if none found
-   */
-  private Optional<RegisteredServer> determineInitialServer(Player player) {
-    // This is a simplified version of the logic. A real implementation might
-    // involve more complex rules for determining the initial server.
-    return server.getAllServers().stream().findFirst();
-  }
-
-  /**
-   * Checks if an IP address is currently throttled due to too many connections.
-   *
-   * @param address the IP address to check
-   * @return true if the IP is throttled, false otherwise
-   */
-  private boolean isIpThrottled(InetAddress address) {
-    return throttledIps.contains(address);
-  }
-
-  /**
-   * Checks if the connection rate from an IP address exceeds the configured limit.
-   *
-   * @param address the IP address to check
-   * @return true if the connection rate is within limits, false otherwise
-   */
-  private boolean checkConnectionRate(InetAddress address) {
-    if (config.getConnectionRateLimit() <= 0) {
-      return true; // Rate limiting is disabled
-    }
-    long now = System.currentTimeMillis();
-    List<Long> timestamps = connectionTimestampsByIp.computeIfAbsent(address, k -> new ArrayList<>());
-    timestamps.add(now);
-    // Remove timestamps older than the configured window
-    timestamps.removeIf(ts -> now - ts > config.getConnectionRateWindowMs());
-    if (timestamps.size() > config.getConnectionRateLimit()) {
-      // Throttle this IP
-      throttledIps.add(address);
-      return false;
-    }
-    return true;
-  }
-
-  /**
-   * Checks if a username matches a suspicious pattern.
-   *
-   * @param username the username to check
-   * @return true if the username is not suspicious, false otherwise
-   */
-  private boolean checkUsernamePattern(String username) {
-    if (!config.isUsernamePatternCheckEnabled()) {
-      return true;
-    }
-    // Example check: block usernames with "bot" in them (case-insensitive)
-    if (username.toLowerCase().contains("bot")) {
-      return false;
-    }
-    return true;
-  }
-
-  /**
-   * Checks if the DNS resolution for a given address and hostname is valid.
-   * This is a placeholder for a more complex DNS check.
-   *
-   * @param address the IP address
-   * @param hostname the hostname
-   * @return true if the DNS resolution is valid, false otherwise
-   */
-  private boolean checkDnsResolution(InetAddress address, String hostname) {
-    // This is a simplified check. A real implementation might involve
-    // reverse DNS lookups or checking against a whitelist/blacklist.
-    return true;
   }
   
   private final VelocityServer server;
@@ -1050,34 +975,6 @@ public class AntiBot {
   }
   
   /**
-   * Processes player movement within the mini-world verification.
-   *
-   * @param player the player
-   * @param x the new x-coordinate
-   * @param y the new y-coordinate
-   * @param z the new z-coordinate
-   */
-  private void processMiniWorldMovement(ConnectedPlayer player, double x, double y, double z) {
-    MiniWorldSession session = miniWorldSessions.get(player.getUniqueId());
-    if (session != null) {
-      session.incrementMovement();
-      session.updatePosition(x, y, z);
-    }
-  }
-
-  /**
-   * Processes player interaction within the mini-world verification.
-   *
-   * @param player the player
-   */
-  private void processMiniWorldInteraction(ConnectedPlayer player) {
-    MiniWorldSession session = miniWorldSessions.get(player.getUniqueId());
-    if (session != null) {
-      session.incrementInteraction();
-    }
-  }
-  
-  /**
    * Configure the AntiBot with new settings.
    *
    * @param config the new configuration
@@ -1176,513 +1073,615 @@ public class AntiBot {
   }
   
   /**
-   * Perform a comprehensive check on a player.
-   * This is used by the antibot check command.
+   * Complete verification process and transfer player to target server.
    *
-   * @param player the player to check
-   * @return true if the player passes all checks, false otherwise
-   */
-  public boolean checkPlayer(Player player) {
-    UUID playerId = player.getUniqueId();
-    
-    // Skip if already verified
-    if (verifiedPlayers.contains(playerId)) {
-      return true;
-    }
-    
-    // Get player state or create if it doesn't exist
-    PlayerState state = playerStates.get(playerId);
-    if (state == null) {
-      state = new PlayerState(playerId, player.getRemoteAddress().getAddress());
-      playerStates.put(playerId, state);
-    }
-    
-    // Run all available checks
-    boolean passedAllChecks = true;
-    
-    if (config.isGravityCheckEnabled() && state.hasEnoughData()) {
-      performGravityCheck(player, state);
-      passedAllChecks = passedAllChecks && (failedChecks.getOrDefault(playerId, 0) == 0);
-    }
-    
-    if (config.isYawCheckEnabled() && state.hasEnoughData()) {
-      performYawCheck(player, state);
-      passedAllChecks = passedAllChecks && (failedChecks.getOrDefault(playerId, 0) == 0);
-    }
-    
-    if (config.isHitboxCheckEnabled()) {
-      performHitboxCheck(player);
-      passedAllChecks = passedAllChecks && (failedChecks.getOrDefault(playerId, 0) == 0);
-    }
-    
-    // If player passed all checks, mark as verified
-    if (passedAllChecks) {
-      verifiedPlayers.add(playerId);
-    }
-    
-    return passedAllChecks;
-  }
-
-  /**
-   * Start a mini-world verification check for a player.
-   * This is used by the antibot miniworld command.
-   *
-   * @param player the player to verify in mini-world
-   * @return true if check started successfully, false otherwise
-   */
-  public boolean startMiniWorldCheck(Player player) {
-    UUID playerId = player.getUniqueId();
-    String username = player.getUsername();
-    
-    // Skip if player is already verified or in mini-world check
-    if (verifiedPlayers.contains(playerId)) {
-      logger.info("Player {} is already verified, skipping mini-world check", username);
-      return false;
-    }
-    
-    if (miniWorldSessions.containsKey(playerId)) {
-      logger.info("Player {} is already in mini-world check", username);
-      return false;
-    }
-    
-    // Remember player's current server as original destination
-    Optional<RegisteredServer> currentServer = player.getCurrentServer()
-        .map(serverConn -> serverConn.getServer());
-    
-    if (currentServer.isPresent()) {
-      originalDestinations.put(playerId, currentServer.get());
-      logger.info("Storing original destination for {} as {}", 
-          username, currentServer.get().getServerInfo().getName());
-    } else {
-      // Determine default server
-      determineInitialServer(player).ifPresent(server -> {
-        originalDestinations.put(playerId, server);
-        logger.info("Storing default destination for {} as {}", 
-            username, server.getServerInfo().getName());
-      });
-    }
-    
-    // Create mini-world session
-    MiniWorldSession session = new MiniWorldSession(playerId, username, 0, 64, 0);
-    miniWorldSessions.put(playerId, session);
-    
-    // Enter virtual verification world
-    virtualWorld.enterVerificationWorld((ConnectedPlayer) player);
-    logger.info("Player {} entered mini-world verification check", username);
-    
-    return true;
-  }
-  
-  /**
-   * Check if a player is currently in a mini-world verification check.
-   *
-   * @param playerId the UUID of the player to check
-   * @return true if the player is in mini-world check, false otherwise
-   */
-  public boolean isInMiniWorldCheck(UUID playerId) {
-    return miniWorldSessions.containsKey(playerId) && !miniWorldSessions.get(playerId).isCompleted();
-  }
-  
-  /**
-   * Inner class to represent a mini-world verification session.
-   * Tracks player movement and interaction during verification.
-   */
-  public class MiniWorldSession {
-    final UUID playerId;
-    final String playerName;
-    final String username;
-    final long startTime;
-    
-    private Vector3d initialPosition;
-    private Vector3d currentPosition;
-    private Vector3d lastPosition;
-    private double maxDistanceFromStart;
-    private double totalDistance;
-    
-    public int movementCount;
-    public int interactionCount;
-    public boolean hasJumped;
-    boolean hasCrouched;
-    public boolean hasInteracted;
-    boolean checkPassed;
-    boolean completed;
-    private final Queue<Long> moveTimestamps = new LinkedList<>();
-    
-    /**
-     * Creates a new mini-world session.
-     *
-     * @param playerId the UUID of the player
-     * @param playerName the name of the player
-     * @param x the initial x coordinate
-     * @param y the initial y coordinate
-     * @param z the initial z coordinate
-     */
-    public MiniWorldSession(UUID playerId, String playerName, double x, double y, double z) {
-      this.playerId = playerId;
-      this.playerName = playerName;
-      this.username = playerName;
-      this.startTime = System.currentTimeMillis();
-      this.initialPosition = new Vector3d(x, y, z);
-      this.currentPosition = initialPosition;
-      this.lastPosition = initialPosition;
-      this.movementCount = 0;
-      this.interactionCount = 0;
-      this.maxDistanceFromStart = 0;
-      this.totalDistance = 0;
-      this.hasJumped = false;
-      this.hasCrouched = false;
-      this.hasInteracted = false;
-      this.checkPassed = false;
-      this.completed = false;
-    }
-    
-    /**
-     * Updates the position of the player.
-     *
-     * @param x the new x coordinate
-     * @param y the new y coordinate
-     * @param z the new z coordinate
-     */
-    public void updatePosition(double x, double y, double z) {
-      lastPosition = currentPosition;
-      currentPosition = new Vector3d(x, y, z);
-      
-      // Calculate distance moved
-      double distanceFromStart = initialPosition.distance(currentPosition);
-      double lastMoveDist = lastPosition.distance(currentPosition);
-      
-      // Update max distance
-      maxDistanceFromStart = Math.max(maxDistanceFromStart, distanceFromStart);
-      
-      // Update total path distance
-      totalDistance += lastMoveDist;
-      
-      // Check for jumping or crouching
-      if (y > lastPosition.getY() + 0.4) {
-        hasJumped = true;
-      } else if (y < lastPosition.getY() - 0.3 && y < lastPosition.getY()) {
-        hasCrouched = true;
-      }
-      
-      // Record timestamp for this movement
-      moveTimestamps.add(System.currentTimeMillis());
-      if (moveTimestamps.size() > 20) { // Keep only last 20 timestamps
-        moveTimestamps.poll();
-      }
-    }
-    
-    /**
-     * Increments the movement count.
-     */
-    public void incrementMovement() {
-      movementCount++;
-    }
-    
-    /**
-     * Increments the interaction count.
-     */
-    public void incrementInteraction() {
-      interactionCount++;
-    }
-    
-    /**
-     * Gets the total distance moved.
-     *
-     * @return the total distance moved
-     */
-    public double getDistanceMoved() {
-      return maxDistanceFromStart;
-    }
-    
-    /**
-     * Gets the total path distance.
-     *
-     * @return the total path distance
-     */
-    public double getTotalPathDistance() {
-      return totalDistance;
-    }
-    
-    /**
-     * Gets the movement complexity (ratio of total path to direct distance).
-     *
-     * @return the movement complexity
-     */
-    public double getMovementComplexity() {
-      if (maxDistanceFromStart < 0.1) {
-        return 1.0;
-      }
-      return totalDistance / maxDistanceFromStart;
-    }
-    
-    /**
-     * Gets whether the player has natural timing between movements.
-     * Bots often move at perfect intervals.
-     *
-     * @return whether the player has natural timing
-     */
-    public boolean hasNaturalTiming() {
-      if (moveTimestamps.size() < 5) {
-        return false;
-      }
-      
-      // Convert queue to array for easier processing
-      Long[] timestamps = moveTimestamps.toArray(new Long[0]);
-      long[] diffs = new long[timestamps.length - 1];
-      
-      for (int i = 0; i < timestamps.length - 1; i++) {
-        diffs[i] = timestamps[i + 1] - timestamps[i];
-      }
-      
-      // Calculate variance in timing
-      double mean = 0;
-      for (long diff : diffs) {
-        mean += diff;
-      }
-      mean /= diffs.length;
-      
-      double variance = 0;
-      for (long diff : diffs) {
-        variance += Math.pow(diff - mean, 2);
-      }
-      variance /= diffs.length;
-      
-      // Natural human movement has some variance in timing
-      return variance > 1000; // At least 1000ms^2 variance
-    }
-    
-    /**
-     * Gets the elapsed time in seconds.
-     *
-     * @return the elapsed time in seconds
-     */
-    public int getElapsedSeconds() {
-      return (int) ((System.currentTimeMillis() - startTime) / 1000);
-    }
-    
-    /**
-     * Checks if the verification is timed out.
-     *
-     * @return whether the verification is timed out
-     */
-    public boolean isTimedOut() {
-      return getElapsedSeconds() > MINIWORLD_CHECK_DURATION_SECONDS * 2;
-    }
-    
-    /**
-     * Checks if the verification session is completed.
-     *
-     * @return whether the verification is completed
-     */
-    public boolean isCompleted() {
-      return completed;
-    }
-    
-    /**
-     * Sets whether the verification session is completed.
-     *
-     * @param completed whether the verification is completed
-     */
-    public void setCompleted(boolean completed) {
-      this.completed = completed;
-    }
-    
-    /**
-     * Completes the verification session with the specified result.
-     *
-     * @param passed whether the verification was passed
-     */
-    public void complete(boolean passed) {
-      this.completed = true;
-      this.checkPassed = passed;
-    }
-    
-    /**
-     * Checks if the verification is considered passed.
-     * This evaluates movement, interactions, and other metrics.
-     *
-     * @return whether the verification is passed
-     */
-    public boolean isCheckPassed() {
-      if (movementCount < MINIWORLD_MIN_MOVEMENTS) {
-        return false;
-      }
-      
-      if (getDistanceMoved() < MINIWORLD_MIN_DISTANCE) {
-        return false;
-      }
-      
-      // Check for some interaction, decent movement, or signs of human behavior
-      return hasJumped || hasInteracted || interactionCount > 2 || hasNaturalTiming();
-    }
-    
-    /**
-     * Gets whether the verification has been passed.
-     *
-     * @return whether the verification has been passed
-     */
-    public boolean isPassed() {
-      return checkPassed;
-    }
-    
-    /**
-     * Sets whether the verification check has passed.
-     *
-     * @param checkPassed whether the verification has passed
-     */
-    public void setCheckPassed(boolean checkPassed) {
-      this.checkPassed = checkPassed;
-    }
-    
-    /**
-     * Gets whether the player has jumped during verification.
-     *
-     * @return whether the player has jumped
-     */
-    public boolean hasJumped() {
-      return hasJumped;
-    }
-
-    /**
-     * Gets whether the player has interacted during verification.
-     *
-     * @return whether the player has interacted
-     */
-    public boolean hasInteracted() {
-      return hasInteracted;
-    }
-    
-    /**
-     * Gets the movement count.
-     *
-     * @return the number of movements recorded
-     */
-    public int getMovementCount() {
-      return movementCount;
-    }
-  }
-  
-  /**
-   * Public accessor for the verified players set.
-   *
-   * @return the set of verified player UUIDs
-   */
-  public Set<UUID> getVerifiedPlayers() {
-    return new HashSet<>(verifiedPlayers);
-  }
-
-  /**
-   * Public accessor for the mini-world sessions map.
-   *
-   * @return a copy of the mini-world sessions map
-   */
-  public Map<UUID, MiniWorldSession> getMiniWorldSessions() {
-    return new ConcurrentHashMap<>(miniWorldSessions);
-  }
-
-  /**
-   * Get a specific mini-world session for a player.
-   *
-   * @param playerId the UUID of the player
-   * @return the mini-world session, or null if not found
-   */
-  public MiniWorldSession getMiniWorldSession(UUID playerId) {
-    return miniWorldSessions.get(playerId);
-  }
-
-  /**
-   * Completes the verification process for a player and transfers them to their target server.
-   *
-   * @param player the player who completed verification
-   * @param targetServer the server to transfer the player to
+   * @param player the player to verify
+   * @param targetServer the target server to connect to
    */
   private void completeVerification(Player player, RegisteredServer targetServer) {
     UUID playerId = player.getUniqueId();
-    String username = player.getUsername();
-
+    
+    // Mark as verified
     verifiedPlayers.add(playerId);
-    suspiciousPlayers.remove(playerId);
     failedChecks.remove(playerId);
+    
+    // Add to pending transfers to track successful connection
+    pendingTransfers.add(playerId);
+    
+    // Clean up session
     miniWorldSessions.remove(playerId);
-
-    logger.info("[VERIFICATION] Player {} successfully completed verification.", username);
-
+    
+    // Transfer player to target server
     transferToTargetServer(player, targetServer);
   }
-
+  
   /**
-   * Handles a failed verification attempt. Depending on the configuration, this will
-   * either kick the player or allow them to connect while marked as suspicious.
+   * Transfer player to target server.
+   *
+   * @param player the player to transfer
+   */
+  private void transferToTargetServer(Player player) {
+    UUID playerId = player.getUniqueId();
+    RegisteredServer targetServer = originalDestinations.get(playerId);
+    
+    if (targetServer == null) {
+      // Try to find a fallback server
+      Optional<RegisteredServer> fallback = server.getServer("lobby")
+          .or(() -> server.getAllServers().stream().findFirst());
+      
+      if (fallback.isPresent()) {
+        targetServer = fallback.get();
+      } else {
+        logger.error("[TRANSFER] No target server found for player {}", player.getUsername());
+        player.disconnect(Component.text("No target server available. Please try again later."));
+        return;
+      }
+    }
+    
+    transferToTargetServer(player, targetServer);
+  }
+  
+  /**
+   * Transfer player to a specific target server.
+   *
+   * @param player the player to transfer
+   * @param targetServer the target server to connect to
+   */
+  private void transferToTargetServer(Player player, RegisteredServer targetServer) {
+    UUID playerId = player.getUniqueId();
+    
+    logger.info("[TRANSFER] Transferring player {} to server {}", 
+        player.getUsername(), targetServer.getServerInfo().getName());
+    
+    // Remove from verification world
+    virtualWorld.exitVerificationWorld((ConnectedPlayer) player);
+    
+    // Add to pending transfers to track successful connection
+    pendingTransfers.add(playerId);
+    
+    // Connect player to target server
+    player.createConnectionRequest(targetServer).fireAndForget();
+  }
+  
+  /**
+   * Handle failed verification by either kicking the player or marking as suspicious.
    *
    * @param player the player who failed verification
    */
   private void handleFailedVerification(Player player) {
     UUID playerId = player.getUniqueId();
-    String username = player.getUsername();
-
-    suspiciousPlayers.add(playerId);
+    
+    // Clean up session
     miniWorldSessions.remove(playerId);
+    originalDestinations.remove(playerId);
+    
+    // Remove from verification world
     virtualWorld.exitVerificationWorld((ConnectedPlayer) player);
-
-    if (config.isKickOnVerificationFail()) {
-      logger.info("[VERIFICATION] Kicking player {} for failing verification.", username);
+    
+    // Mark as suspicious
+    suspiciousPlayers.add(playerId);
+    
+    if (config.isKickEnabled()) {
+      logger.info("[VERIFICATION] Player {} failed verification and will be kicked", player.getUsername());
       player.disconnect(Component.text(config.getKickMessage()));
     } else {
-      logger.warn("[VERIFICATION] Player {} failed verification but is being allowed to connect.",
-          username);
-      // Find original destination or a fallback and transfer the player
-      RegisteredServer destination = originalDestinations.get(playerId);
-      if (destination == null) {
-        Optional<RegisteredServer> fallback = server.getServer(MINIWORLD_FALLBACK_SERVER)
-            .or(() -> server.getAllServers().stream().findFirst());
-        if (fallback.isPresent()) {
-          destination = fallback.get();
-        } else {
-          player.disconnect(Component.text("Could not find a server to connect to."));
-          return;
-        }
-      }
-      transferToTargetServer(player, destination);
+      logger.info("[VERIFICATION] Player {} failed verification but will be allowed to connect as suspicious", 
+          player.getUsername());
+      transferToTargetServer(player);
     }
   }
-
+  
   /**
-   * Transfers a player to their target server after they have passed verification.
-   *
-   * @param player the player to transfer
-   * @param targetServer the destination server
+   * Process player movement in the virtual verification world.
+   * 
+   * @param player the player who moved
+   * @param x new X coordinate
+   * @param y new Y coordinate
+   * @param z new Z coordinate
    */
-  private void transferToTargetServer(Player player, RegisteredServer targetServer) {
+  private void processMiniWorldMovement(Player player, double x, double y, double z) {
     UUID playerId = player.getUniqueId();
     String username = player.getUsername();
-
-    logger.info("[TRANSFER] Transferring player {} to server {}.",
-        username, targetServer.getServerInfo().getName());
-
-    virtualWorld.exitVerificationWorld((ConnectedPlayer) player);
-    originalDestinations.remove(playerId);
-    pendingTransfers.add(playerId);
-
-    player.createConnectionRequest(targetServer).fireAndForget();
-  }
-
-  /**
-   * Overloaded method to transfer a player to their original destination or a fallback.
-   *
-   * @param player the player to transfer
-   */
-  private void transferToTargetServer(Player player) {
-    RegisteredServer destination = originalDestinations.get(player.getUniqueId());
-    if (destination == null) {
-      Optional<RegisteredServer> fallback = server.getServer(MINIWORLD_FALLBACK_SERVER)
-          .or(() -> server.getAllServers().stream().findFirst());
-      if (fallback.isPresent()) {
-        destination = fallback.get();
-      } else {
-        player.disconnect(Component.text("Could not find a server to connect to."));
-        return;
+    
+    // Check if player is in virtual world
+    if (!virtualWorld.isPlayerInVerificationWorld(playerId)) {
+      return;
+    }
+    
+    // Update virtual world position and check for verification completion
+    Vector3d newPosition = new Vector3d(x, y, z);
+    boolean verificationComplete = virtualWorld.handlePlayerMovement((ConnectedPlayer) player, newPosition);
+    
+    // Update mini-world session
+    MiniWorldSession session = miniWorldSessions.get(playerId);
+    if (session != null) {
+      session.updatePosition(x, y, z);
+      session.incrementMovement();
+      
+      if (config.isDebugMode()) {
+        logger.debug("[VIRTUAL-MOVEMENT] Player {} moved to [{}, {}, {}], movements: {}", 
+            username, x, y, z, session.movementCount);
+      }
+      
+      if (verificationComplete) {
+        session.setCompleted(true);
+        session.setCheckPassed(true);
+        
+        logger.info("[VIRTUAL-MOVEMENT] Player {} completed verification through virtual world", username);
+        
+        // Find target server and complete verification
+        RegisteredServer originalDestination = originalDestinations.get(playerId);
+        if (originalDestination != null) {
+          completeVerification(player, originalDestination);
+        } else {
+          // Try to find a fallback server
+          Optional<RegisteredServer> fallback = server.getServer("lobby")
+              .or(() -> server.getAllServers().stream().findFirst());
+          
+          if (fallback.isPresent()) {
+            completeVerification(player, fallback.get());
+          } else {
+            logger.error("[VIRTUAL-MOVEMENT] No target server found for verified player {}", username);
+            handleFailedVerification(player);
+          }
+        }
       }
     }
-    transferToTargetServer(player, destination);
+  }
+  
+  /**
+   * Tracks the state of a player for bot detection.
+   * This includes position, rotation, and other metrics.
+   */
+  private class PlayerState {
+    private final UUID playerId;
+    private final InetAddress address;
+    private final long connectionTime;
+
+    private Vector3d currentPosition;
+    private Vector3d lastPosition;
+    private final List<Vector3d> positionHistory = new ArrayList<>();
+    
+    private float currentYaw;
+    private float lastYaw;
+    private final List<Float> yawHistory = new ArrayList<>();
+    
+    private float currentPitch;
+    private float lastPitch;
+    
+    private boolean onGround = true;
+    private long lastGroundTime;
+    private long lastPositiveYVelocityTime;
+    private long lastUpdateTime;
+    
+    private int moveCount = 0;
+    private int interactionCount = 0;
+    private int yawViolations = 0;
+    
+    public PlayerState(UUID playerId, InetAddress address) {
+      this.playerId = playerId;
+      this.address = address;
+      this.connectionTime = System.currentTimeMillis();
+      this.lastUpdateTime = connectionTime;
+      this.lastGroundTime = connectionTime;
+    }
+    
+    public void updatePositionAndRotation(double x, double y, double z, float yaw, float pitch) {
+      lastPosition = currentPosition;
+      currentPosition = new Vector3d(x, y, z);
+      
+      if (positionHistory.size() >= 20) {
+        positionHistory.remove(0);
+      }
+      positionHistory.add(currentPosition);
+      
+      lastYaw = currentYaw;
+      currentYaw = yaw;
+      
+      if (yawHistory.size() >= 20) {
+        yawHistory.remove(0);
+      }
+      yawHistory.add(yaw);
+      
+      lastPitch = currentPitch;
+      currentPitch = pitch;
+      
+      moveCount++;
+      lastUpdateTime = System.currentTimeMillis();
+      
+      // Track Y velocity for gravity check
+      if (lastPosition != null) {
+        if (y > lastPosition.getY()) {
+          lastPositiveYVelocityTime = System.currentTimeMillis();
+        }
+      }
+    }
+    
+    public void incrementInteractionCount() {
+      interactionCount++;
+      lastUpdateTime = System.currentTimeMillis();
+    }
+    
+    public void incrementYawViolations() {
+      yawViolations++;
+    }
+    
+    public void resetYawViolations() {
+      yawViolations = 0;
+    }
+    
+    public int getYawViolations() {
+      return yawViolations;
+    }
+    
+    public void resetGravityViolation() {
+      lastGroundTime = System.currentTimeMillis();
+    }
+    
+    public double getSecondsSincePositiveYVelocity() {
+      return (System.currentTimeMillis() - lastPositiveYVelocityTime) / 1000.0;
+    }
+    
+    public boolean isFirstMove() {
+      return moveCount <= 2 || lastPosition == null;
+    }
+    
+    public boolean isOnGround() {
+      // We don't have access to this directly in Velocity, so we have to approximate
+      return System.currentTimeMillis() - lastGroundTime < 500;
+    }
+    
+    public boolean hasEnoughData() {
+      return moveCount >= 5 && positionHistory.size() >= 5;
+    }
+    
+    public boolean hasRepeatedRotationPattern() {
+      // Simple check for repeated rotation patterns
+      if (yawHistory.size() < 10) {
+        return false;
+      }
+      
+      // Check for exact repeats (suspicious for bots)
+      Map<Float, Integer> counts = new HashMap<>();
+      for (Float y : yawHistory) {
+        counts.put(y, counts.getOrDefault(y, 0) + 1);
+      }
+      
+      // If any rotation appears more than 50% of the time, that's suspicious
+      return counts.values().stream().anyMatch(count -> count > yawHistory.size() / 2);
+    }
+    
+    public Vector3d getCurrentPosition() {
+      return currentPosition;
+    }
+    
+    public Vector3d getLastPosition() {
+      return lastPosition;
+    }
+    
+    public float getCurrentYaw() {
+      return currentYaw;
+    }
+    
+    public float getLastYaw() {
+      return lastYaw;
+    }
+    
+    public int getMoveCount() {
+      return moveCount;
+    }
+    
+    public int getInteractionCount() {
+      return interactionCount;
+    }
+    
+    public long getTimeSinceConnection() {
+      return (System.currentTimeMillis() - connectionTime) / 1000;
+    }
+    
+    public long getLastUpdateTime() {
+      return lastUpdateTime;
+    }
+  }
+}
+
+/**
+ * Tracks a player's session in the verification mini-world.
+ * Used to analyze player behavior and determine if they pass verification.
+ */
+public class MiniWorldSession {
+  public final UUID playerId;
+  public final String playerName;
+  public final long startTime;
+  public final String username;
+  
+  // Position tracking
+  private double startX, startY, startZ;
+  private double lastX, lastY, lastZ;
+  private double maxDistance = 0.0;
+  private double totalDistance = 0.0;
+  
+  // Movement analysis
+  public int movementCount = 0;
+  public int interactionCount = 0;
+  private final List<Long> movementTimestamps = new ArrayList<>();
+  private final List<Vector3d> positions = new ArrayList<>();
+  
+  // Advanced verification metrics
+  public boolean hasJumped = false;
+  public boolean hasCrouched = false;
+  public boolean hasInteracted = false;
+  
+  // Verification state
+  private boolean completed = false;
+  private boolean checkPassed = false;
+  
+  /**
+   * Creates a new mini-world session.
+   *
+   * @param playerId the UUID of the player
+   * @param username the username of the player
+   * @param startX the starting X coordinate
+   * @param startY the starting Y coordinate
+   * @param startZ the starting Z coordinate
+   */
+  public MiniWorldSession(UUID playerId, String username, double startX, double startY, double startZ) {
+    this.playerId = playerId;
+    this.playerName = username; 
+    this.username = username;
+    this.startTime = System.currentTimeMillis();
+    
+    this.startX = startX;
+    this.startY = startY;
+    this.startZ = startZ;
+    
+    this.lastX = startX;
+    this.lastY = startY;
+    this.lastZ = startZ;
+    
+    this.positions.add(new Vector3d(startX, startY, startZ));
+  }
+  
+  /**
+   * Updates the player's position in the mini-world.
+   *
+   * @param x the new X coordinate
+   * @param y the new Y coordinate
+   * @param z the new Z coordinate
+   */
+  public void updatePosition(double x, double y, double z) {
+    // Calculate distance from last position
+    double dx = x - lastX;
+    double dy = y - lastY;
+    double dz = z - lastZ;
+    double distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+    
+    // Update total distance
+    totalDistance += distance;
+    
+    // Check for jumping
+    if (y > lastY + 0.4) {
+      hasJumped = true;
+    }
+    
+    // Calculate distance from start position
+    dx = x - startX;
+    dy = y - startY;
+    dz = z - startZ;
+    double distFromStart = Math.sqrt(dx*dx + dy*dy + dz*dz);
+    
+    // Update max distance
+    if (distFromStart > maxDistance) {
+      maxDistance = distFromStart;
+    }
+    
+    // Save current position
+    lastX = x;
+    lastY = y;
+    lastZ = z;
+    
+    // Record movement time and position
+    movementTimestamps.add(System.currentTimeMillis());
+    positions.add(new Vector3d(x, y, z));
+    
+    // Limit history size
+    if (positions.size() > 100) {
+      positions.remove(0);
+    }
+    if (movementTimestamps.size() > 100) {
+      movementTimestamps.remove(0);
+    }
+  }
+  
+  /**
+   * Increments the movement counter.
+   */
+  public void incrementMovement() {
+    movementCount++;
+  }
+  
+  /**
+   * Records an interaction in the mini-world.
+   */
+  public void recordInteraction() {
+    interactionCount++;
+    hasInteracted = true;
+  }
+  
+  /**
+   * Gets the total distance the player has moved from the start position.
+   *
+   * @return the distance moved
+   */
+  public double getDistanceMoved() {
+    return maxDistance;
+  }
+  
+  /**
+   * Gets the total distance of the path the player has taken.
+   *
+   * @return the total path distance
+   */
+  public double getTotalPathDistance() {
+    return totalDistance;
+  }
+  
+  /**
+   * Gets the complexity of the player's movement pattern.
+   * Higher values indicate more human-like movement.
+   *
+   * @return the movement complexity score
+   */
+  public double getMovementComplexity() {
+    if (positions.size() < 3) {
+      return 0.0;
+    }
+    
+    // Calculate the sum of angles between consecutive movement segments
+    double angleSum = 0.0;
+    for (int i = 0; i < positions.size() - 2; i++) {
+      Vector3d p1 = positions.get(i);
+      Vector3d p2 = positions.get(i + 1);
+      Vector3d p3 = positions.get(i + 2);
+      
+      // Calculate vectors for two consecutive segments
+      double v1x = p2.getX() - p1.getX();
+      double v1y = p2.getY() - p1.getY();
+      double v1z = p2.getZ() - p1.getZ();
+      
+      double v2x = p3.getX() - p2.getX();
+      double v2y = p3.getY() - p2.getY();
+      double v2z = p3.getZ() - p2.getZ();
+      
+      // Calculate angle between vectors using dot product
+      double dotProduct = v1x*v2x + v1y*v2y + v1z*v2z;
+      double mag1 = Math.sqrt(v1x*v1x + v1y*v1y + v1z*v1z);
+      double mag2 = Math.sqrt(v2x*v2x + v2y*v2y + v2z*v2z);
+      
+      if (mag1 > 0.001 && mag2 > 0.001) {
+        double cosTheta = dotProduct / (mag1 * mag2);
+        // Clamp to [-1, 1] to avoid floating point errors
+        cosTheta = Math.max(-1, Math.min(1, cosTheta));
+        double angle = Math.acos(cosTheta);
+        angleSum += angle;
+      }
+    }
+    
+    // Normalize by number of angles calculated
+    return angleSum / (positions.size() - 2);
+  }
+  
+  /**
+   * Checks if the player's movement timing appears natural.
+   * Bots often move at very regular intervals.
+   *
+   * @return true if timing appears human
+   */
+  public boolean hasNaturalTiming() {
+    if (movementTimestamps.size() < 5) {
+      return false;
+    }
+    
+    // Calculate standard deviation of time between movements
+    List<Long> intervals = new ArrayList<>();
+    for (int i = 0; i < movementTimestamps.size() - 1; i++) {
+      intervals.add(movementTimestamps.get(i + 1) - movementTimestamps.get(i));
+    }
+    
+    double mean = intervals.stream().mapToLong(Long::longValue).average().orElse(0);
+    double variance = intervals.stream()
+        .mapToDouble(interval -> Math.pow(interval - mean, 2))
+        .average().orElse(0);
+    double stdDev = Math.sqrt(variance);
+    
+    // Coefficient of variation (stdDev / mean) - higher means more variability
+    double cv = stdDev / mean;
+    
+    // Humans typically have higher variability than bots
+    return cv > 0.1;
+  }
+  
+  /**
+   * Gets the elapsed time of this session in seconds.
+   *
+   * @return the elapsed seconds
+   */
+  public long getElapsedSeconds() {
+    return (System.currentTimeMillis() - startTime) / 1000;
+  }
+  
+  /**
+   * Checks if this session has been completed.
+   *
+   * @return true if completed
+   */
+  public boolean isCompleted() {
+    return completed;
+  }
+  
+  /**
+   * Sets whether this session is completed.
+   *
+   * @param completed whether the session is completed
+   */
+  public void setCompleted(boolean completed) {
+    this.completed = completed;
+  }
+  
+  /**
+   * Completes this session with the given check result.
+   *
+   * @param passed whether the player passed verification
+   */
+  public void complete(boolean passed) {
+    this.completed = true;
+    this.checkPassed = passed;
+  }
+  
+  /**
+   * Checks if this session has passed verification.
+   *
+   * @return true if verification passed
+   */
+  public boolean isCheckPassed() {
+    // Basic check - did player move enough and interact with the world?
+    if (movementCount < MINIWORLD_MIN_MOVEMENTS) {
+      return false;
+    }
+    
+    if (getDistanceMoved() < MINIWORLD_MIN_DISTANCE) {
+      return false;
+    }
+    
+    // More complex checks for human-like behavior
+    return hasJumped || hasInteracted || interactionCount > 2 || hasNaturalTiming();
+  }
+  
+  /**
+   * Checks if this session has passed verification.
+   *
+   * @return true if passed
+   */
+  public boolean isPassed() {
+    return checkPassed;
+  }
+  
+  /**
+   * Sets whether this session has passed verification.
+   *
+   * @param checkPassed whether verification passed
+   */
+  public void setCheckPassed(boolean checkPassed) {
+    this.checkPassed = checkPassed;
+  }
+  
+  /**
+   * Checks if this session has timed out.
+   *
+   * @return true if timed out
+   */
+  public boolean isTimedOut() {
+    // Consider timed out if session is over 3 times the expected duration
+    return getElapsedSeconds() > MINIWORLD_CHECK_DURATION_SECONDS * 3;
   }
 }

@@ -389,36 +389,46 @@ map = "Velocity"
 show-plugins = false
 
 # ==================================================================================
-# ANTIBOT VIRTUAL WORLD SETUP - NO EXTERNAL SERVER REQUIRED!
+# SETUP GUIDE FOR ANTIBOT VERIFICATION SERVER
 # ==================================================================================
 # 
-# The AntiBot system now includes a built-in virtual verification world that runs
-# entirely within the proxy. No external Minecraft server is needed!
+# To set up the antibot-verification server:
 # 
-# HOW IT WORKS:
-# 1. When a player connects, they're placed in a virtual flat world within the proxy
-# 2. Players must move around naturally to prove they're human
-# 3. After verification, they're transferred to their intended server
-# 4. The entire process is seamless and requires no additional servers
+# 1. CREATE A NEW MINECRAFT SERVER
+#    - Download the latest Paper/Spigot/Vanilla server jar
+#    - Create a new folder for the verification server
+#    - Place the server jar in the folder
+#    - Configure server.properties with:
+#      * server-port=25569
+#      * online-mode=false
+#      * level-type=flat
+#      * spawn-protection=0
+#      * gamemode=adventure
+#      * difficulty=peaceful
+#      * max-players=100
 # 
-# CONFIGURATION:
-# - Adjust mini-world-duration, mini-world-min-movements, and mini-world-min-distance above
-# - Enable debug-mode to see detailed verification logs
-# - The virtual world automatically generates a simple flat terrain
+# 2. CONFIGURE THE WORLD
+#    - Use a flat world or simple lobby world
+#    - Ensure there's enough space for players to move around
+#    - Consider adding simple decorations or instructions
+#    - Set the spawn point in a safe location
 # 
-# TESTING:
-# 1. Connect to the proxy with debug-mode enabled
-# 2. Watch the logs to see verification process
-# 3. Move around in the virtual world until verification completes
-# 4. You'll be transferred to your target server automatically
+# 3. START THE SERVER
+#    - Start the verification server before starting the proxy
+#    - Ensure it's running on port 25569
+#    - Check that players can connect directly to it
 # 
-# BENEFITS:
-# ✓ No external server setup required
-# ✓ Better performance (everything runs in-proxy)
-# ✓ More reliable (no dependency on external services)
-# ✓ Easier to configure and maintain
-# ✓ Lower resource usage overall
+# 4. TEST THE SETUP
+#    - Connect to the proxy with debug-mode enabled
+#    - Verify that players are sent to the verification world
+#    - Check that they're transferred to the lobby after verification
+#    - Monitor logs for any errors
 # 
-# This virtual world system provides the same bot protection as the previous
-# external server approach, but with much simpler setup and better reliability!
-#
+# 5. PRODUCTION SETUP
+#    - Disable debug-mode in both antibot and layer4-protection sections
+#    - Enable kick-enabled in antibot section if desired
+#    - Monitor performance and adjust settings as needed
+# 
+# If you see "Verification server 'antibot-verification' not found" in the logs,
+# it means the verification server is not running or not properly configured.
+# 

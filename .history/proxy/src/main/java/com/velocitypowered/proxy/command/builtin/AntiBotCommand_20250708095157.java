@@ -27,7 +27,6 @@ import com.velocitypowered.api.plugin.PluginContainer;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.proxy.VelocityServer;
 import com.velocitypowered.proxy.connection.antiddos.AntiBot;
-import com.velocitypowered.proxy.connection.antiddos.AntiBot.MiniWorldSession;
 import com.velocitypowered.proxy.connection.antiddos.AntiBotConfig;
 
 import java.util.Map;
@@ -370,7 +369,7 @@ public class AntiBotCommand {
                     source.sendMessage(Component.text("Time elapsed: ", NamedTextColor.YELLOW)
                         .append(Component.text(session.getElapsedSeconds() + "/" + antiBot.getConfig().getMiniWorldDuration() + " seconds", NamedTextColor.AQUA)));
                     source.sendMessage(Component.text("Movements: ", NamedTextColor.YELLOW)
-                        .append(Component.text(session.getMovementCount() + "/" + antiBot.getConfig().getMiniWorldMinMovements(), NamedTextColor.AQUA)));
+                        .append(Component.text(session.movementCount + "/" + antiBot.getConfig().getMiniWorldMinMovements(), NamedTextColor.AQUA)));
                     source.sendMessage(Component.text("Distance moved: ", NamedTextColor.YELLOW)
                         .append(Component.text(String.format("%.2f", session.getDistanceMoved()) + " blocks", NamedTextColor.AQUA)));
                     source.sendMessage(Component.text("Has interacted: ", NamedTextColor.YELLOW)

@@ -32,7 +32,6 @@ public class AntiBotConfig {
   private final String kickMessage;
   private final boolean checkOnlyFirstJoin;
   private final int verificationTimeout;
-  private final boolean kickOnVerificationFail;
   
   // Individual check configurations
   private final boolean gravityCheckEnabled;
@@ -96,7 +95,6 @@ public class AntiBotConfig {
     this.kickMessage = builder.kickMessage;
     this.checkOnlyFirstJoin = builder.checkOnlyFirstJoin;
     this.verificationTimeout = builder.verificationTimeout;
-    this.kickOnVerificationFail = builder.kickOnVerificationFail;
     this.gravityCheckEnabled = builder.gravityCheckEnabled;
     this.hitboxCheckEnabled = builder.hitboxCheckEnabled;
     this.yawCheckEnabled = builder.yawCheckEnabled;
@@ -155,10 +153,6 @@ public class AntiBotConfig {
   
   public int getVerificationTimeout() {
     return verificationTimeout;
-  }
-  
-  public boolean isKickOnVerificationFail() {
-    return kickOnVerificationFail;
   }
   
   public boolean isGravityCheckEnabled() {
@@ -439,13 +433,11 @@ public class AntiBotConfig {
     private boolean enabled = true;
     private boolean kickEnabled = true;
     private boolean debugMode = false;
-    private int kickThreshold = 10;
-    private String kickMessage = "Kicked for suspected bot activity.";
-    private boolean checkOnlyFirstJoin = false;
+    private int kickThreshold = 5;
+    private String kickMessage = "§cYou have been kicked by AntiBot protection";
+    private boolean checkOnlyFirstJoin = true;
     private int verificationTimeout = 30;
-    private boolean kickOnVerificationFail = true;
     
-    // Individual check configurations
     private boolean gravityCheckEnabled = true;
     private boolean hitboxCheckEnabled = true;
     private boolean yawCheckEnabled = true;
@@ -575,13 +567,14 @@ public class AntiBotConfig {
       return this;
     }
     
-    public Builder kickOnVerificationFail(boolean kickOnVerificationFail) {
-      this.kickOnVerificationFail = kickOnVerificationFail;
-      return this;
-    }
-    
-    public Builder gravityCheckEnabled(boolean gravityCheckEnabled) {
-      this.gravityCheckEnabled = gravityCheckEnabled;
+    /**
+     * Sets whether gravity/physics checks are enabled.
+     *
+     * @param enabled whether the check is enabled
+     * @return this builder
+     */
+    public Builder gravityCheckEnabled(boolean enabled) {
+      this.gravityCheckEnabled = enabled;
       return this;
     }
     

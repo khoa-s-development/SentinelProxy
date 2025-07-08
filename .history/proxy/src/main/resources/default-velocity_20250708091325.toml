@@ -97,13 +97,13 @@ creative = "127.0.0.1:25568"
 # 2. Configure it with a simple flat world or lobby
 # 3. Set the server to offline mode
 # 4. Ensure the server is always running when the proxy is active
-# 5. Your main lobby/hub server where players will connect after verification
+# 5. Players will be temporarily sent here for verification before being moved to their target server
 #
-# NOTE: AntiBot now uses a built-in virtual verification world within the proxy!
-# No external verification server is required.
+# IMPORTANT: If this server is not running, players will bypass verification!
+antibot-verification = "127.0.0.1:25569"
 
 # In what order we should try servers when a player logs in or is kicked from a server.
-# Players will be temporarily placed in a virtual verification world (if AntiBot is enabled),
+# Players will first be sent to the antibot-verification server (if AntiBot is enabled),
 # then transferred to the lobby after passing verification.
 try = [
     "lobby"
@@ -205,34 +205,17 @@ kick-after-rate-limited-tab-completes = 0
 # ========================================
 
 [antibot]
-# ==================================================================================
-# ANTIBOT SYSTEM CONFIGURATION
-# ==================================================================================
-# The AntiBot system provides advanced protection against automated attacks and bot networks.
-# It uses a multi-layered approach including behavioral analysis, mini-world verification,
-# and pattern detection to identify and mitigate bot attacks.
-
 # Enable or disable the AntiBot system
 enabled = true
 
 # Whether to kick players who fail bot checks (true) or just log warnings (false)
-# Recommended: Start with false for testing, then enable once you're confident
 kick-enabled = false
 
-# Enable debug mode for verbose logging
-# WARNING: This generates A LOT of console output! Only enable for troubleshooting.
-# Set to false for production use to avoid log spam.
+# Enable debug mode for verbose logging (WARNING: generates a lot of console output)
 debug-mode = false
 
 # Only check players on their first join to the network
-# This improves performance for returning players
 check-only-first-join = true
-
-# ==================================================================================
-# BEHAVIORAL CHECKS
-# ==================================================================================
-# These checks analyze player behavior patterns to detect bots
-# Enable only the checks you need - too many can cause false positives
 
 # Enable gravity check - detects clients that don't simulate gravity properly
 gravity-check-enabled = false
@@ -246,59 +229,20 @@ yaw-check-enabled = false
 # Enable client brand check - validates the client mod/brand information
 client-brand-check-enabled = false
 
-# ==================================================================================
-# VIRTUAL WORLD VERIFICATION
-# ==================================================================================
-# This is the primary verification method. Players are sent to a built-in virtual
-# verification world within the proxy where they must perform natural movements to prove they are human.
-
-# Enable virtual world verification - creates a verification world within the proxy
-# No external server required! Everything runs locally within the proxy.
+# Enable mini-world check - creates a verification world/lobby for players
 mini-world-check-enabled = true
-
-# How long (in seconds) players have to complete verification
-mini-world-duration = 10
-
-# Minimum number of movement packets required
-mini-world-min-movements = 3
-
-# Minimum distance (in blocks) players must move
-mini-world-min-distance = 2.0
-
-# ==================================================================================
-# CONNECTION PROTECTION
-# ==================================================================================
-# These settings protect against connection-based attacks
 
 # Enable connection rate limiting - limits connections per IP
 connection-rate-limit-enabled = true
-
-# Maximum connections per IP within the time window
-connection-rate-limit = 3
-
-# Time window for connection rate limiting (milliseconds)
-connection-rate-window-ms = 5000
-
-# How long to throttle connections after rate limit is exceeded (milliseconds)
-throttle-duration-ms = 15000
-
-# ==================================================================================
-# PATTERN DETECTION
-# ==================================================================================
 
 # Enable username pattern check - detects bot-like usernames
 username-pattern-check-enabled = true
 
 # Enable DNS check - performs reverse DNS lookups on connecting IPs
-# WARNING: This can be slow and may cause connection delays
 dns-check-enabled = false
 
 # Enable latency check - detects clients with unusual ping patterns
 latency-check-enabled = false
-
-# ==================================================================================
-# ACTION SETTINGS
-# ==================================================================================
 
 # Number of failed checks before taking action
 kick-threshold = 5
@@ -306,9 +250,15 @@ kick-threshold = 5
 # Message to show when kicking suspicious players
 kick-message = "You have been kicked for suspicious behavior. Please try again."
 
-# ==================================================================================
-# ADVANCED SETTINGS
-# ==================================================================================
+# Mini-world verification settings
+mini-world-duration = 10
+mini-world-min-movements = 3
+mini-world-min-distance = 2.0
+
+# Connection rate limiting settings
+connection-rate-limit = 3
+connection-rate-window-ms = 5000
+throttle-duration-ms = 15000
 
 # Latency check settings (if enabled)
 min-latency-ms = 50
@@ -318,17 +268,10 @@ max-latency-ms = 500
 allowed-brands = ["vanilla", "fabric", "forge", "quilt", "optifine"]
 
 [layer4-protection]
-# ==================================================================================
-# LAYER 4 (TCP/UDP) DDOS PROTECTION
-# ==================================================================================
-# This provides low-level network protection against DDoS attacks
-
 # Enable Layer 4 (TCP/UDP) DDoS protection
 enabled = true
 
-# Enable debug mode for verbose logging
-# WARNING: This generates A LOT of console output! Only enable for troubleshooting.
-# Set to false for production use to avoid log spam.
+# Enable debug mode for verbose logging (WARNING: generates a lot of console output)
 debug-mode = false
 
 # Maximum connections allowed per IP address
@@ -341,19 +284,12 @@ max-packets-per-second = 100
 rate-limit-window-ms = 1000
 
 # How long to block suspicious IPs (in milliseconds)
-# Default: 300000 = 5 minutes
 block-duration-ms = 300000
 
 # Enable advanced lobby check logging
-# This logs connection details but is less verbose than debug-mode
-advanced-logging-enabled = false
+advanced-logging-enabled = true
 
 [layer7-protection]
-# ==================================================================================
-# LAYER 7 (MINECRAFT PROTOCOL) PROTECTION
-# ==================================================================================
-# This provides application-level protection against Minecraft-specific attacks
-
 # Enable Layer 7 (Minecraft protocol) protection
 enabled = true
 
@@ -387,38 +323,3 @@ map = "Velocity"
 
 # Whether plugins should be shown in query response by default or not
 show-plugins = false
-
-# ==================================================================================
-# ANTIBOT VIRTUAL WORLD SETUP - NO EXTERNAL SERVER REQUIRED!
-# ==================================================================================
-# 
-# The AntiBot system now includes a built-in virtual verification world that runs
-# entirely within the proxy. No external Minecraft server is needed!
-# 
-# HOW IT WORKS:
-# 1. When a player connects, they're placed in a virtual flat world within the proxy
-# 2. Players must move around naturally to prove they're human
-# 3. After verification, they're transferred to their intended server
-# 4. The entire process is seamless and requires no additional servers
-# 
-# CONFIGURATION:
-# - Adjust mini-world-duration, mini-world-min-movements, and mini-world-min-distance above
-# - Enable debug-mode to see detailed verification logs
-# - The virtual world automatically generates a simple flat terrain
-# 
-# TESTING:
-# 1. Connect to the proxy with debug-mode enabled
-# 2. Watch the logs to see verification process
-# 3. Move around in the virtual world until verification completes
-# 4. You'll be transferred to your target server automatically
-# 
-# BENEFITS:
-# ✓ No external server setup required
-# ✓ Better performance (everything runs in-proxy)
-# ✓ More reliable (no dependency on external services)
-# ✓ Easier to configure and maintain
-# ✓ Lower resource usage overall
-# 
-# This virtual world system provides the same bot protection as the previous
-# external server approach, but with much simpler setup and better reliability!
-#

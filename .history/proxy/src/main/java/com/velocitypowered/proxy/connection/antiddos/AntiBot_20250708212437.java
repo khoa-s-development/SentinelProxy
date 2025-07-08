@@ -21,6 +21,7 @@ import com.velocitypowered.api.event.PostOrder;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.DisconnectEvent;
 import com.velocitypowered.api.event.ResultedEvent;
+import java.util.concurrent.CompletableFuture;
 import com.velocitypowered.api.event.connection.LoginEvent;
 import com.velocitypowered.api.event.player.PlayerChatEvent;
 import com.velocitypowered.api.event.connection.PluginMessageEvent;
@@ -33,6 +34,8 @@ import com.velocitypowered.proxy.VelocityServer;
 import com.velocitypowered.proxy.connection.client.ConnectedPlayer;
 import com.velocitypowered.proxy.protocol.packet.PluginMessagePacket;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
@@ -40,6 +43,7 @@ import io.netty.channel.ChannelHandlerContext;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Map;
+import java.util.Iterator;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.Set;
@@ -48,6 +52,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 import java.util.LinkedList;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -104,9 +109,9 @@ public class AntiBot {
    * @return the initial server, or empty if none found
    */
   private Optional<RegisteredServer> determineInitialServer(Player player) {
-    // This is a simplified version of the logic. A real implementation might
-    // involve more complex rules for determining the initial server.
-    return server.getAllServers().stream().findFirst();
+    return server.getForcedHost(player.getVirtualHost().orElse(null))
+        .or(() -> server.getServer(player.getVirtualHost().map(InetSocketAddress::getHostString)
+            .flatMap(server::getForcedHost).map(s -> s.getServerInfo().getName()).orElse("")));
   }
 
   /**
@@ -1299,11 +1304,11 @@ public class AntiBot {
     private double maxDistanceFromStart;
     private double totalDistance;
     
-    public int movementCount;
-    public int interactionCount;
-    public boolean hasJumped;
+    int movementCount;
+    int interactionCount;
+    boolean hasJumped;
     boolean hasCrouched;
-    public boolean hasInteracted;
+    boolean hasInteracted;
     boolean checkPassed;
     boolean completed;
     private final Queue<Long> moveTimestamps = new LinkedList<>();
