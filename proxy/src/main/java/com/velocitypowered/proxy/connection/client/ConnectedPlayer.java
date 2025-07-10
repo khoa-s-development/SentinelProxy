@@ -1177,12 +1177,14 @@ public class ConnectedPlayer implements MinecraftConnectionAssociation, Player, 
 
   @Override
   @Deprecated
+  @SuppressWarnings("deprecation")
   public void sendResourcePack(String url) {
     sendResourcePackOffer(new VelocityResourcePackInfo.BuilderImpl(url).build());
   }
 
   @Override
   @Deprecated
+  @SuppressWarnings("deprecation")
   public void sendResourcePack(String url, byte[] hash) {
     sendResourcePackOffer(new VelocityResourcePackInfo.BuilderImpl(url).setHash(hash).build());
   }
@@ -1250,12 +1252,14 @@ public class ConnectedPlayer implements MinecraftConnectionAssociation, Player, 
 
   @Override
   @Deprecated
+  @SuppressWarnings("deprecation")
   public @Nullable ResourcePackInfo getAppliedResourcePack() {
     return this.resourcePackHandler.getFirstAppliedPack();
   }
 
   @Override
   @Deprecated
+  @SuppressWarnings("deprecation")
   public @Nullable ResourcePackInfo getPendingResourcePack() {
     return this.resourcePackHandler.getFirstPendingPack();
   }

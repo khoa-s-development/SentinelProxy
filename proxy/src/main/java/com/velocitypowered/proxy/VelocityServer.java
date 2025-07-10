@@ -714,7 +714,7 @@ public class VelocityServer implements ProxyServer, ForwardingAudience {
 
           CompletableFuture<Void> playersTeardownFuture = CompletableFuture.allOf(players.stream()
                   .map(ConnectedPlayer::getTeardownFuture)
-                  .toArray((IntFunction<CompletableFuture<Void>[]>) CompletableFuture[]::new));
+                  .toArray(CompletableFuture[]::new));
 
           playersTeardownFuture.get(10, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
